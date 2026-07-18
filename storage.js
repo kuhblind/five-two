@@ -1,7 +1,7 @@
 /* storage.js — versioned localStorage persistence + normalization + export/import */
 
 const STORE_KEY = 'fivetwo.state';
-const STORE_VERSION = 5;
+const STORE_VERSION = 6;
 
 let storageWarned = false;
 
@@ -112,6 +112,21 @@ function migrate(state) {
     delete state.exercises.db_front_squat;
     delete state.exercises.russian_twist;
     state.version = 5;
+  }
+  // v5 -> v6: no medicine ball in the kit — drop the slam
+  if (state.version < 6) {
+    (state.journeys || []).forEach((j) => {
+      if (!j.blocks) return;
+      ['early', 'late'].forEach((b) => {
+        Object.keys(j.blocks[b] || {}).forEach((day) => {
+          if (Array.isArray(j.blocks[b][day])) {
+            j.blocks[b][day] = j.blocks[b][day].map((id) => (id === 'med_ball_slam' ? 'db_snatch' : id));
+          }
+        });
+      });
+    });
+    if (state.exercises) delete state.exercises.med_ball_slam;
+    state.version = 6;
   }
   return state;
 }
