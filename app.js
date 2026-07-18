@@ -71,6 +71,34 @@ function toggleTravelMode() {
   save(); render();
 }
 
+function localDate() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function toggleBigThree() {
+  const key = localDate();
+  if (S.bigThree[key]) delete S.bigThree[key];
+  else S.bigThree[key] = true;
+  save(); render();
+}
+
+function bigThreeWeekCount() {
+  let n = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(Date.now() - i * 86400000);
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    if (S.bigThree[key]) n++;
+  }
+  return n;
+}
+
+function setBucket(exId, bucket) {
+  if (!S.exercises[exId]) return;
+  S.exercises[exId].bucket = bucket || null;
+  save(); render();
+}
+
 function is52Day(type) { return !['ZONE2', 'REST', 'SPRINT'].includes(type); }
 
 function slotsFor(j, week, type) {
@@ -526,6 +554,28 @@ function dayBadge(type) {
 
 function dayLabel(type) { return (DAY_TYPES[type] || { label: type }).label; }
 
+function bigThreeCardHTML() {
+  const doneToday = !!S.bigThree[localDate()];
+  const ids = ['bird_dog', 'side_plank', 'mcgill_curl_up'];
+  const detail = view.b3open
+    ? ids.map((id) => {
+        const e = ex(id);
+        return `<div class="lib-item"><span class="pattern-ico">${patternIcon(e.pattern, 30)}</span>
+          <div class="grow"><b>${esc(e.name)}</b><p class="muted small">${esc(e.desc)}</p></div></div>`;
+      }).join('')
+    : '';
+  return `<div class="card">
+    <div class="row spread">
+      <div onclick="view.b3open=!view.b3open;render()" style="cursor:pointer">
+        <h3>Big Three ${doneToday ? '· done' : ''}</h3>
+        <p class="muted small">Bird dog · side plank · McGill curl-up — ~5 min daily back insurance. ${bigThreeWeekCount()}/7 this week ${view.b3open ? '▾' : '▸'}</p>
+      </div>
+      <button class="z2check ${doneToday ? 'on' : ''}" onclick="toggleBigThree()" aria-label="mark Big Three done today">${doneToday ? '✓' : '·'}</button>
+    </div>
+    ${detail}
+  </div>`;
+}
+
 function travelCardHTML() {
   const on = S.settings.travelMode;
   return `<div class="card ${on ? 'highlight' : ''}">
@@ -587,6 +637,7 @@ function vHome() {
       ${detail}
       <button class="btn-primary mt" onclick="startSession(${next.week}, ${next.dayIndex})">Start</button>
     </div>`;
+    html += bigThreeCardHTML();
     html += zone2CardHTML(next.week);
     html += travelCardHTML();
   } else {
@@ -1063,7 +1114,11 @@ function programLibraryHTML() {
         <div class="grow">
           <div class="row spread">
             <b>${esc(e.name)}</b>
-            <span class="badge">${e.bucket ? e.bucket + ' reps' : 'seconds'}</span>
+            ${e.measure === 'secs'
+              ? '<span class="badge">seconds</span>'
+              : `<select class="bucket-sel" onchange="setBucket('${e.id}', this.value)" aria-label="target bucket for ${esc(e.name)}">
+                  ${BUCKETS.map((b) => `<option value="${b}" ${e.bucket === b ? 'selected' : ''}>${b}</option>`).join('')}
+                </select>`}
           </div>
           <p class="muted small">${esc(e.desc || e.cue || '')}</p>
         </div>

@@ -1,7 +1,7 @@
 /* storage.js — versioned localStorage persistence + normalization + export/import */
 
 const STORE_KEY = 'fivetwo.state';
-const STORE_VERSION = 6;
+const STORE_VERSION = 7;
 
 let storageWarned = false;
 
@@ -128,6 +128,23 @@ function migrate(state) {
     if (state.exercises) delete state.exercises.med_ball_slam;
     state.version = 6;
   }
+  // v6 -> v7: descriptions/cues live in the seed, buckets belong to the user.
+  // Refresh all seed-owned fields on existing entries (fixes stale descs from
+  // earlier releases), merge missing ones, keep user-set buckets untouched.
+  if (state.version < 7) {
+    if (!state.exercises || typeof state.exercises !== 'object') state.exercises = {};
+    if (typeof SEED_EXERCISES !== 'undefined') {
+      SEED_EXERCISES.forEach((e) => {
+        const cur = state.exercises[e.id];
+        if (!cur) { state.exercises[e.id] = e; return; }
+        cur.name = e.name; cur.group = e.group; cur.measure = e.measure;
+        cur.pattern = e.pattern; cur.cue = e.cue; cur.desc = e.desc;
+        // cur.bucket stays as the user set it
+      });
+    }
+    state.bigThree = {};
+    state.version = 7;
+  }
   return state;
 }
 
@@ -147,6 +164,7 @@ function normalizeState(state) {
   if (!Array.isArray(state.journeys)) state.journeys = [];
   if (!Array.isArray(state.sessions)) state.sessions = [];
   if (!state.zone2Checks || typeof state.zone2Checks !== 'object') state.zone2Checks = {};
+  if (!state.bigThree || typeof state.bigThree !== 'object') state.bigThree = {};
 
   state.journeys = state.journeys.filter((j) => j && j.id && j.blocks && Array.isArray(j.weekPlan) && j.weekPlan.length === 7);
   state.journeys.forEach((j) => {

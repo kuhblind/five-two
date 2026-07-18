@@ -275,6 +275,12 @@ label.field { display: block; margin: 0.8rem 0 0.3rem; color: var(--muted); font
 
 .timer-clock.paused { opacity: 0.5; }
 
+.bucket-sel {
+  width: auto; padding: 0.25rem 0.5rem; font-size: 0.75rem; font-weight: 700;
+  border-radius: 999px; background: var(--surface2); color: var(--accent);
+  border: 1px solid var(--border);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
   button:active { transform: none; }

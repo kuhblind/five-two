@@ -1,6 +1,6 @@
 /* data.js — exercise library + seed journey (Waterson 5-2 accumulator, adapted) */
 
-const BUCKETS = ['6-8', '9-12', '13-16', '17-20+'];
+const BUCKETS = ['3-5', '6-8', '9-12', '13-16', '17-20+'];
 
 const CARDIO_MODALITIES = [
   'Run / Sprints', 'Bike', 'Row', 'Stepper',
@@ -72,7 +72,7 @@ const SEED_EXERCISES = [
   // legs
   { id: 'box_squat', name: 'Box squat', group: 'legs', measure: 'reps', bucket: '9-12', pattern: 'squat',
     cue: 'Sit back to the box, drive up through heels',
-    desc: 'Stand in front of a box, barbell or dumbbells racked. Sit back and down until you touch the box, then drive up through the heels without bouncing.' },
+    desc: 'Stand in front of a box, barbell or dumbbells racked. Sit back and down until you touch the box, then drive up through the heels without bouncing. As slot A you do it five times: ramp lighter in rounds 1–2, working weight rounds 3–5.' },
   { id: 'paused_box_squat', name: 'Paused box squat', group: 'legs', measure: 'reps', bucket: '6-8', pattern: 'squat',
     cue: '2s pause on the box, no bounce',
     desc: 'Like a box squat, but stay seated for two full seconds with tension on, then stand up explosively. Kills momentum — pure strength.' },
@@ -87,7 +87,7 @@ const SEED_EXERCISES = [
     desc: 'Hold one dumbbell or kettlebell vertically against your chest, elbows tucked. Squat until your elbows brush the inside of your knees, stand tall.' },
   { id: 'trap_bar_deadlift', name: 'Trap bar deadlift', group: 'legs', measure: 'reps', bucket: '6-8', pattern: 'hinge',
     cue: 'Neutral grip, push the floor away, no rounding',
-    desc: 'Stand inside the trap bar, neutral grip on the handles. Brace, keep the spine long, and push the floor away to stand tall. The centered load and high handles make it the back-friendliest heavy pull — your hinge anchor.' },
+    desc: 'Stand inside the trap bar, neutral grip on the handles. Brace, keep the spine long, and push the floor away to stand tall. The centered load and high handles make it the back-friendliest heavy pull — your hinge anchor. As slot A: ramp rounds 1–2, working weight rounds 3–5; if the low handles feel deep, elevate the plates.' },
   { id: 'bulgarian_split_squat', name: 'Bulgarian split squat', group: 'legs', measure: 'reps', bucket: '9-12', pattern: 'lunge',
     cue: 'Rear foot on bench, per leg',
     desc: 'Rear foot elevated on a bench behind you, front leg does the work. Lower until the front thigh is parallel, drive back up. Per leg.' },
@@ -133,7 +133,7 @@ const SEED_EXERCISES = [
     desc: 'Overhand grip on the bar, start from a full hang, pull until the chin clears the bar, lower with control. No kipping. The kg field = added weight (belt or DB between the feet); 0 = bodyweight.' },
   { id: 'weighted_pull_up', name: 'Weighted pull-up', group: 'upper', measure: 'reps', bucket: '6-8', pattern: 'pull',
     cue: 'Add belt/dumbbell, strict form',
-    desc: 'Pull-up with added load — dip belt or a dumbbell between the feet. Strict form, full range. Log the added weight.' },
+    desc: 'Pull-up with added load — dip belt or a dumbbell between the feet. Strict form, full range. Log the added weight. As an anchor: bodyweight in round 1, add load from round 2.' },
   { id: 'chin_up', name: 'Chin-up', group: 'upper', measure: 'reps', bucket: '6-8', pattern: 'pull',
     cue: 'Underhand grip, full range',
     desc: 'Like a pull-up but with an underhand (palms toward you) grip — more biceps, slightly easier. Full hang to chin over bar. The kg field = added weight; 0 = bodyweight.' },
@@ -378,6 +378,7 @@ function seedState() {
     activeJourneyId: 'j1',
     sessions: [],
     zone2Checks: {},
+    bigThree: {},
     current: null,
   };
 }
