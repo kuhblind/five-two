@@ -484,7 +484,8 @@ function render() {
       summary: vSummary, journal: vJournal, session: vSession, progress: vProgress,
       program: vProgram, settings: vSettings,
       activation: () => vReading('Activation', ACTIVATION_IDEAS,
-        'Ten minutes before the first exercise. Raise the heart rate, move every joint you will load, and check in with yourself: sleep, niggles, energy.'),
+        'Ten minutes before the first exercise. Sequence: 5 min easy cardio → wake-up (cat-cow, bird dog, glute bridge) → joints (leg swings, hip circles, ankle rockers) → the stretches below → first ramp set. And check in: sleep, niggles, energy.',
+        ACTIVATION_STRETCHES),
       deactivation: () => vReading('Deactivation', DEACTIVATION_IDEAS,
         'Ten to fifteen minutes after the last cardio burst. Lower the heart rate, stretch what you trained, breathe, refuel. This marks the end of the session.'),
     };
@@ -806,7 +807,7 @@ function vRest() {
     </div>`;
 }
 
-function vReading(title, ideas, intro) {
+function vReading(title, ideas, intro, stretches) {
   const backBtn = S.current
     ? `<button class="btn-primary mb" onclick="go('workout')">← Back to session</button>`
     : '';
@@ -814,10 +815,8 @@ function vReading(title, ideas, intro) {
       <span class="title">${title}</span></div>
     ${backBtn}
     <div class="card highlight"><p class="muted">${intro}</p></div>
-    ${ideas.map((it) => `<div class="card">
-      <h3>${esc(it.name)}</h3>
-      <p class="muted small">${esc(it.text)}</p>
-    </div>`).join('')}
+    ${vReadingInline(ideas)}
+    ${stretches ? '<h2>Dynamic stretches</h2>' + vReadingInline(stretches) : ''}
     ${backBtn}`;
 }
 
@@ -961,7 +960,7 @@ function vProgram() {
   if (!view.tab) view.tab = 'days';
 
   const body = view.tab === 'library' ? programLibraryHTML()
-    : view.tab === 'activation' ? vReadingInline(ACTIVATION_IDEAS)
+    : view.tab === 'activation' ? vReadingInline(ACTIVATION_IDEAS) + '<h2>Dynamic stretches</h2>' + vReadingInline(ACTIVATION_STRETCHES)
     : view.tab === 'deactivation' ? vReadingInline(DEACTIVATION_IDEAS)
     : programDaysHTML(j);
 

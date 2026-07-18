@@ -1,7 +1,7 @@
 /* storage.js — versioned localStorage persistence + normalization + export/import */
 
 const STORE_KEY = 'fivetwo.state';
-const STORE_VERSION = 4;
+const STORE_VERSION = 5;
 
 let storageWarned = false;
 
@@ -65,6 +65,53 @@ function migrate(state) {
       SEED_EXERCISES.forEach((e) => { if (!state.exercises[e.id]) state.exercises[e.id] = e; });
     }
     state.version = 4;
+  }
+  // v4 -> v5: back-safe exercise upgrade (52y / 1.99m / protected lumbar).
+  // Seed-merge new exercises; days still matching the old seed get the new
+  // seed wholesale; customized days only have deleted exercises replaced.
+  if (state.version < 5) {
+    if (!state.exercises || typeof state.exercises !== 'object') state.exercises = {};
+    if (typeof SEED_EXERCISES !== 'undefined') {
+      SEED_EXERCISES.forEach((e) => { if (!state.exercises[e.id]) state.exercises[e.id] = e; });
+    }
+    const DELETED = { db_front_squat: 'trap_bar_deadlift', russian_twist: 'dead_bug' };
+    const OLD_BLOCKS = {
+      early: {
+        LEGS1:  ['box_squat', 'reverse_lunge', 'hip_thrust', 'box_step_up', 'band_lateral_walk'],
+        UPPER1: ['pull_up', 'db_bench_press', 'overhead_press', 'bent_over_row', 'ab_rollout'],
+        MIXED1: ['box_jump', 'kb_swing', 'thruster', 'plank_to_pike', 'farmers_carry'],
+        LEGS2:  ['goblet_squat', 'bulgarian_split_squat', 'romanian_deadlift', 'calf_raise', 'wall_sit'],
+        UPPER2: ['incline_db_press', 'lat_pulldown', 'dips', 'shoulder_matrix', 'face_pull'],
+        MIXED2: ['burpee', 'walking_lunge', 'renegade_row', 'med_ball_slam', 'mountain_climbers'],
+      },
+      late: {
+        LEGS1:  ['paused_box_squat', 'deficit_reverse_lunge', 'single_leg_hip_thrust', 'lateral_box_step', 'band_matrix'],
+        UPPER1: ['weighted_pull_up', 'bench_press', 'arnold_press', 'single_arm_row', 'hanging_knee_raise'],
+        MIXED1: ['broad_jump', 'kb_clean_press', 'db_snatch', 'v_up', 'suitcase_carry'],
+        LEGS2:  ['db_front_squat', 'lateral_lunge', 'single_leg_rdl', 'jump_squat', 'wall_sit'],
+        UPPER2: ['weighted_dip', 'chin_up', 'cable_chest_fly', 'lateral_raise', 'pallof_press'],
+        MIXED2: ['devil_press', 'box_jump_over', 'sprawl', 'russian_twist', 'bear_crawl'],
+      },
+    };
+    (state.journeys || []).forEach((j) => {
+      if (!j.blocks) return;
+      ['early', 'late'].forEach((b) => {
+        Object.keys(j.blocks[b] || {}).forEach((day) => {
+          const cur = j.blocks[b][day];
+          if (!Array.isArray(cur)) return;
+          const old = OLD_BLOCKS[b] && OLD_BLOCKS[b][day];
+          const neu = (typeof SEED_BLOCKS !== 'undefined') && SEED_BLOCKS[b] && SEED_BLOCKS[b][day];
+          if (old && neu && JSON.stringify(cur) === JSON.stringify(old)) {
+            j.blocks[b][day] = neu.slice();
+          } else {
+            j.blocks[b][day] = cur.map((id) => DELETED[id] || id);
+          }
+        });
+      });
+    });
+    delete state.exercises.db_front_squat;
+    delete state.exercises.russian_twist;
+    state.version = 5;
   }
   return state;
 }

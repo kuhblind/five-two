@@ -3,11 +3,11 @@
 const BUCKETS = ['6-8', '9-12', '13-16', '17-20+'];
 
 const CARDIO_MODALITIES = [
-  'Run / Sprints', 'Bike', 'Row', 'SkiErg',
+  'Run / Sprints', 'Bike', 'Row', 'Stepper',
   'Heavy bag', 'Battle ropes', 'Skipping', 'Plyo circuit',
 ];
 
-const ZONE2_MODALITIES = ['Bike', 'Run', 'Row', 'Walk / Hike', 'SkiErg', 'Swim'];
+const ZONE2_MODALITIES = ['Bike', 'Run', 'Row', 'Walk / Hike', 'Stepper', 'Swim'];
 
 const DAY_TYPES = {
   LEGS1:  { label: 'Legs 1',  kind: 'legs' },
@@ -22,7 +22,7 @@ const DAY_TYPES = {
   ZONE2:  { label: 'Zone 2',  kind: 'zone2' },
 };
 
-const SPRINT_MODALITIES = ['Run / Track', 'Bike', 'Row', 'SkiErg'];
+const SPRINT_MODALITIES = ['Run / Track', 'Bike', 'Row', 'Stepper'];
 
 /* Activation & deactivation repositories — paraphrased ideas in the spirit of
    the Intelligent Fitness bolt-ons. ~10 min before, ~10-15 min after. */
@@ -34,6 +34,28 @@ const ACTIVATION_IDEAS = [
   { name: 'Pedal to standing', text: 'From the pike position (hands flat, hips high), pedal the feet one at a time, walk the feet toward the hands, and roll up to standing slowly. Wakes the calves and hamstrings.' },
   { name: 'Plank → pike → cobra', text: 'From a forearm plank, lift the hips to a pike, lower them until they hover, then come forward into a gentle cobra looking slightly up. Spine and abdominals ready.' },
   { name: 'Agility bursts', text: 'Sidesteps, a few light accelerations with controlled deceleration, ten seconds of fast feet. Prime the nervous system, especially before sprint or plyo work.' },
+];
+
+/* Concrete dynamic stretches — drawn from the 10-Weeks Wednesday sessions
+   plus warm-up standards, filtered for a protected lower back. */
+const ACTIVATION_STRETCHES = [
+  { name: 'Bear crawl into pigeon', text: 'Hinge down, walk the hands out to a plank. Bring one knee forward and lower toward the floor at 90°, sink onto the forearms, then reach the arms long. Ease out, walk back, stand up. Per side — opens hips and glutes.' },
+  { name: 'Bear crawl into cobra', text: 'Walk out to a plank, drop the hips and bring the chest forward into a gentle cobra, looking slightly up. Walk back to standing. Spine extension without load.' },
+  { name: 'Reverse lunge + hip-flexor reach', text: 'Step back into a lunge, rear knee down, interlock the fingers and reach overhead with a slight lean back until the hip flexor stretches. Add a small forward-back rock. Per side — the tall-lifter essential.' },
+  { name: 'Quad-stretch into reverse lunge', text: 'Standing quad stretch (heel to glute, hold ~30 s), release straight back into a reverse lunge with arms locked overhead, then rise and hug the knee to the chest. One flowing sequence per leg.' },
+  { name: "World's greatest stretch", text: 'Long lunge, both hands inside the front foot. Drop the back knee, sink the hips, then rotate the inside arm up to the ceiling, following it with your eyes. Per side — hips, hamstrings and thoracic spine in one move.' },
+  { name: 'Leg swings', text: 'Hold something stable. Swing one leg front-to-back 10-15 times, then side-to-side across the body. Loosens hips and hamstrings dynamically — no bouncing at end range.' },
+  { name: 'Hip circles / openers', text: 'Standing, lift one knee and draw the biggest circle you can — inward rotations, then outward. Per side.' },
+  { name: 'Cat-cow', text: 'On all fours, alternate slowly between rounding the spine up (cat) and letting it sink with the chest forward (cow), moving with the breath. Wakes up every spinal segment gently.' },
+  { name: 'Thoracic openers (book drill)', text: 'Kneeling, thread one arm under the body then rotate it up to the ceiling, chest following. Per side. Upper-back rotation so the lower back does not have to provide it later.' },
+  { name: 'Spinal mobility rock', text: 'On your back, hug both knees to the chest and rock gently forward and back, growing the range a little each rep. From the Wednesday sessions — a favourite before hinge days.' },
+  { name: 'Glutes & piriformis (figure-4)', text: 'On your back, ankle over the opposite knee, clasp behind the thigh and pull toward you until the glute stretches. Per side.' },
+  { name: 'Pedal to standing', text: 'Pike position, hands flat, pedal the heels one at a time, walk the feet to the hands and roll up slowly to standing. Calves and hamstrings switched on.' },
+  { name: 'Side crab', text: 'In a low squat, crawl sideways a few steps, shoot the trailing leg out, return, and go back the other way. Animalistic movement — ankles, hips and coordination.' },
+  { name: 'Upper-body matrix', text: 'Kneeling: cross-body shoulder pull, hands clasped behind the back with chest proud, triceps reach down the spine, wrist circles both ways, and a gentle side neck stretch. ~30 s each.' },
+  { name: '90-90 hip switch', text: 'Sitting with both knees bent at 90°, one in front, one to the side, rotate the knees together over to the other side without using the hands. Internal + external hip rotation in one drill.' },
+  { name: 'Ankle rockers', text: 'Half-kneeling, front foot flat about a hand-width from a wall. Drive the knee over the toes to touch the wall, heel stays down. Per side — squat depth lives in the ankles.' },
+  { name: 'Goblet-squat prying', text: 'Hold the bottom of a light goblet squat and gently shift weight side to side, elbows prying the knees out. 30-45 s. Opens the hips exactly where the squat needs them.' },
 ];
 
 const DEACTIVATION_IDEAS = [
@@ -63,9 +85,9 @@ const SEED_EXERCISES = [
   { id: 'goblet_squat', name: 'Goblet squat', group: 'legs', measure: 'reps', bucket: '9-12', pattern: 'squat',
     cue: 'Elbows inside knees at depth',
     desc: 'Hold one dumbbell or kettlebell vertically against your chest, elbows tucked. Squat until your elbows brush the inside of your knees, stand tall.' },
-  { id: 'db_front_squat', name: 'DB front squat', group: 'legs', measure: 'reps', bucket: '9-12', pattern: 'squat',
-    cue: 'Dumbbells racked at shoulders',
-    desc: 'One dumbbell on each shoulder, elbows high. Squat to depth keeping the torso upright — the front load forces a strong upper back.' },
+  { id: 'trap_bar_deadlift', name: 'Trap bar deadlift', group: 'legs', measure: 'reps', bucket: '6-8', pattern: 'hinge',
+    cue: 'Neutral grip, push the floor away, no rounding',
+    desc: 'Stand inside the trap bar, neutral grip on the handles. Brace, keep the spine long, and push the floor away to stand tall. The centered load and high handles make it the back-friendliest heavy pull — your hinge anchor.' },
   { id: 'bulgarian_split_squat', name: 'Bulgarian split squat', group: 'legs', measure: 'reps', bucket: '9-12', pattern: 'lunge',
     cue: 'Rear foot on bench, per leg',
     desc: 'Rear foot elevated on a bench behind you, front leg does the work. Lower until the front thigh is parallel, drive back up. Per leg.' },
@@ -142,6 +164,9 @@ const SEED_EXERCISES = [
   { id: 'single_arm_row', name: 'Single-arm DB row', group: 'upper', measure: 'reps', bucket: '9-12', pattern: 'pull',
     cue: 'Knee on bench, per arm',
     desc: 'One knee and hand on the bench, flat back. Row the dumbbell to the hip in one strong arc without twisting the torso. Per arm.' },
+  { id: 'chest_supported_row', name: 'Chest-supported DB row', group: 'upper', measure: 'reps', bucket: '9-12', pattern: 'pull',
+    cue: 'Chest on incline bench, row both DBs',
+    desc: 'Lie chest-down on an incline bench, a dumbbell in each hand. Row both to the hips, squeezing the shoulder blades. All the rowing, none of the lower-back load — the tall-lifter row.' },
   { id: 'shoulder_matrix', name: 'Shoulder matrix', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'raise',
     cue: 'Lateral + front raises, soft elbows',
     desc: 'Light dumbbells: a set of lateral raises to shoulder height, straight into a set of front raises. Soft elbows, no swinging. One pair = one rep.' },
@@ -176,9 +201,15 @@ const SEED_EXERCISES = [
   { id: 'v_up', name: 'V-up', group: 'core', measure: 'reps', bucket: '13-16', pattern: 'core',
     cue: 'Hands to feet, control down',
     desc: 'Lying flat, fold up bringing straight arms and legs together into a V, then lower both with control without resting.' },
-  { id: 'russian_twist', name: 'Russian twist', group: 'core', measure: 'reps', bucket: '17-20+', pattern: 'core',
-    cue: 'Heels light, rotate through torso',
-    desc: 'Seated, leaning back with heels light on the floor, rotate a plate or dumbbell side to side. Left+right = one rep.' },
+  { id: 'dead_bug', name: 'Dead bug', group: 'core', measure: 'reps', bucket: '9-12', pattern: 'core',
+    cue: 'Lower back pressed to floor, opposite arm + leg',
+    desc: 'On your back, arms up, knees at 90°. Lower one arm and the opposite leg toward the floor while the lower back stays pressed down, then switch. Anti-extension core work with zero spine load. Per side.' },
+  { id: 'bird_dog', name: 'Bird dog', group: 'core', measure: 'reps', bucket: '9-12', pattern: 'core',
+    cue: 'On all fours, opposite arm + leg, no wobble',
+    desc: 'On hands and knees, extend one arm and the opposite leg until level with the torso, hold a beat, return without letting the hips tilt. A McGill back-resilience staple. Per side.' },
+  { id: 'mcgill_curl_up', name: 'McGill curl-up', group: 'core', measure: 'reps', bucket: '9-12', pattern: 'core',
+    cue: 'Hands under lower back, lift head + shoulders only',
+    desc: 'On your back, one knee bent, hands under the natural arch of the lower back. Lift just the head and shoulders an inch, hold, lower. Trains the abs while the spine stays neutral — the back-safe crunch. Alternate the bent leg.' },
   { id: 'mountain_climbers', name: 'Mountain climbers', group: 'core', measure: 'secs', bucket: null, pattern: 'core',
     cue: 'Fast knees, flat back',
     desc: 'High plank, drive the knees toward the chest alternately as fast as clean form allows. Logged in seconds.' },
@@ -285,13 +316,14 @@ const SEED_EXERCISES = [
 /* Travel mode: gym exercise -> band/bodyweight substitute (same movement pattern).
    Exercises not listed are already hotel-compatible and stay as they are. */
 const TRAVEL_SUBS = {
-  box_squat: 'band_squat', paused_box_squat: 'band_squat', goblet_squat: 'band_squat', db_front_squat: 'band_squat',
+  box_squat: 'band_squat', paused_box_squat: 'band_squat', goblet_squat: 'band_squat',
+  trap_bar_deadlift: 'band_rdl',
   deficit_reverse_lunge: 'reverse_lunge', bulgarian_split_squat: 'split_squat',
   box_step_up: 'walking_lunge', lateral_box_step: 'lateral_lunge',
   romanian_deadlift: 'band_rdl',
   hip_thrust: 'glute_bridge', single_leg_hip_thrust: 'single_leg_glute_bridge',
   pull_up: 'band_pulldown', weighted_pull_up: 'band_pulldown', chin_up: 'band_pulldown', lat_pulldown: 'band_pulldown',
-  bent_over_row: 'band_row', single_arm_row: 'band_row', renegade_row: 'band_row',
+  bent_over_row: 'band_row', single_arm_row: 'band_row', renegade_row: 'band_row', chest_supported_row: 'band_row',
   face_pull: 'band_pull_apart',
   db_bench_press: 'push_up', bench_press: 'push_up', incline_db_press: 'push_up',
   cable_chest_fly: 'band_chest_press',
@@ -313,19 +345,19 @@ const TRAVEL_SPRINT_MODALITIES = ['Stair runs', 'Burpees', 'Shadow boxing', 'Hig
 const SEED_BLOCKS = {
   early: {
     LEGS1:  ['box_squat', 'reverse_lunge', 'hip_thrust', 'box_step_up', 'band_lateral_walk'],
-    UPPER1: ['pull_up', 'db_bench_press', 'overhead_press', 'bent_over_row', 'ab_rollout'],
+    UPPER1: ['pull_up', 'db_bench_press', 'overhead_press', 'chest_supported_row', 'ab_rollout'],
     MIXED1: ['box_jump', 'kb_swing', 'thruster', 'plank_to_pike', 'farmers_carry'],
-    LEGS2:  ['goblet_squat', 'bulgarian_split_squat', 'romanian_deadlift', 'calf_raise', 'wall_sit'],
+    LEGS2:  ['trap_bar_deadlift', 'bulgarian_split_squat', 'goblet_squat', 'calf_raise', 'wall_sit'],
     UPPER2: ['incline_db_press', 'lat_pulldown', 'dips', 'shoulder_matrix', 'face_pull'],
     MIXED2: ['burpee', 'walking_lunge', 'renegade_row', 'med_ball_slam', 'mountain_climbers'],
   },
   late: {
     LEGS1:  ['paused_box_squat', 'deficit_reverse_lunge', 'single_leg_hip_thrust', 'lateral_box_step', 'band_matrix'],
     UPPER1: ['weighted_pull_up', 'bench_press', 'arnold_press', 'single_arm_row', 'hanging_knee_raise'],
-    MIXED1: ['broad_jump', 'kb_clean_press', 'db_snatch', 'v_up', 'suitcase_carry'],
-    LEGS2:  ['db_front_squat', 'lateral_lunge', 'single_leg_rdl', 'jump_squat', 'wall_sit'],
+    MIXED1: ['broad_jump', 'kb_clean_press', 'db_snatch', 'mcgill_curl_up', 'suitcase_carry'],
+    LEGS2:  ['trap_bar_deadlift', 'lateral_lunge', 'single_leg_rdl', 'jump_squat', 'wall_sit'],
     UPPER2: ['weighted_dip', 'chin_up', 'cable_chest_fly', 'lateral_raise', 'pallof_press'],
-    MIXED2: ['devil_press', 'box_jump_over', 'sprawl', 'russian_twist', 'bear_crawl'],
+    MIXED2: ['devil_press', 'box_jump_over', 'sprawl', 'dead_bug', 'bear_crawl'],
   },
 };
 
