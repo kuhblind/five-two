@@ -4,7 +4,7 @@ let S = loadState() || seedState();
 saveState(S);
 
 let view = { name: 'home' };
-let timer = null;       // { endTs, total, interval, finished }
+let timer = null;       // { endTs, total, interval, finished, paused, pausedLeft }
 let wakeLock = null;
 
 /* ---------- icons (inline SVG, stroke-based) ---------- */
@@ -58,10 +58,12 @@ function ex(id) {
   return S.exercises[id] || { id, name: String(id || 'unknown'), measure: 'reps', bucket: null, group: '?', pattern: 'hold', cue: '', desc: '' };
 }
 
-function dayType(j, dayIndex) { return j.weekPlan[dayIndex] || 'ZONE2'; }
+function dayType(j, dayIndex) { return j.weekPlan[dayIndex] || 'REST'; }
+
+function is52Day(type) { return !['ZONE2', 'REST', 'SPRINT'].includes(type); }
 
 function slotsFor(j, week, type) {
-  if (!j || type === 'ZONE2') return [];
+  if (!j || !is52Day(type)) return [];
   const block = j.blocks[blockForWeek(week)] || {};
   return (block[type] || []).filter(Boolean);
 }
@@ -101,6 +103,13 @@ function lastLogged(exId) {
     }
   }
   return null;
+}
+
+function lastLoggedTs(exId) {
+  for (let i = S.sessions.length - 1; i >= 0; i--) {
+    if ((S.sessions[i].sets || []).some((x) => x.ex === exId)) return S.sessions[i].ts || 0;
+  }
+  return -1; // never done
 }
 
 function bucketFloor(bucket) {
@@ -155,6 +164,8 @@ function startSession(week, dayIndex) {
     if (!confirm('This day is already logged. Log it again?')) return;
   }
   if (type === 'ZONE2') { go('zone2', { week, dayIndex }); return; }
+  if (type === 'REST') { go('rest', { week, dayIndex }); return; }
+  if (type === 'SPRINT') { go('sprint', { week, dayIndex }); return; }
 
   const slots = slotsFor(j, week, type);
   if (!slots.length) {
@@ -164,22 +175,55 @@ function startSession(week, dayIndex) {
   }
   S.current = {
     journeyId: j.id, week, dayIndex, dayType: type,
-    round: 1, phase: 'lift',
+    round: 1, phase: 'readiness',
+    slots: null, readiness: null, effort: null,
     sets: [], cardio: [],
     roundEntries: null,
     lastModality: S.lastModality || CARDIO_MODALITIES[0],
     startedTs: Date.now(),
   };
-  initRound();
   save();
   requestWake();
   go('workout');
 }
 
+/* Sore: keep the A/B anchors, but where a C/D/E exercise was trained recently
+   and a same-group alternative is staler (or never done), swap it in for
+   fresh stimulus. */
+function sorenessSwap(slots) {
+  const out = slots.slice();
+  for (let i = 2; i < out.length; i++) {
+    const curTs = lastLoggedTs(out[i]);
+    if (curTs < 0) continue; // never done -> already novel
+    const group = ex(out[i]).group;
+    let best = null, bestTs = curTs;
+    Object.values(S.exercises).forEach((e) => {
+      if (e.group !== group || out.includes(e.id)) return;
+      const ts = lastLoggedTs(e.id);
+      if (ts < bestTs) { best = e.id; bestTs = ts; }
+    });
+    if (best) out[i] = best;
+  }
+  return out;
+}
+
+function pickReadiness(mode) {
+  const c = S.current;
+  if (!c || c.phase !== 'readiness') return;
+  const j = journey();
+  let slots = slotsFor(j, c.week, c.dayType).slice(0, 5);
+  if (mode === 'tired') slots = slots.slice().reverse();
+  if (mode === 'sore') slots = sorenessSwap(slots);
+  c.slots = slots;
+  c.readiness = mode;
+  c.phase = 'lift';
+  initRound();
+  save(); render();
+}
+
 function initRound() {
   const c = S.current;
-  const j = journey();
-  const slots = slotsFor(j, c.week, c.dayType).slice(0, c.round);
+  const slots = (c.slots || []).slice(0, c.round);
   c.roundEntries = slots.map((exId) => {
     // prefill: latest set this session, else history, else bucket floor / 0 kg
     const inSession = c.sets.slice().reverse().find((s) => s.ex === exId);
@@ -189,6 +233,7 @@ function initRound() {
       ex: exId,
       amount: prev ? prev.amount : bucketFloor(e.bucket),
       weight: prev ? prev.weight : 0,
+      fresh: !prev,
       done: false,
       info: false,
     };
@@ -242,7 +287,7 @@ function commitRound() {
 }
 
 function timerTick() {
-  if (!timer) return;
+  if (!timer || timer.paused) return;
   if (remainingSecs() <= 0 && !timer.finished) {
     timer.finished = true;
     clearInterval(timer.interval);
@@ -256,22 +301,45 @@ function timerTick() {
 
 function startTimer(totalSecs) {
   stopTimer();
-  timer = { endTs: Date.now() + totalSecs * 1000, total: totalSecs, finished: false };
+  timer = { endTs: Date.now() + totalSecs * 1000, total: totalSecs, finished: false, paused: false, pausedLeft: 0 };
   timer.interval = setInterval(timerTick, 250);
 }
 
 function stopTimer() { if (timer && timer.interval) clearInterval(timer.interval); timer = null; }
 
-function remainingSecs() { return timer ? Math.max(0, Math.ceil((timer.endTs - Date.now()) / 1000)) : 0; }
+function remainingSecs() {
+  if (!timer) return 0;
+  if (timer.paused) return timer.pausedLeft;
+  return Math.max(0, Math.ceil((timer.endTs - Date.now()) / 1000));
+}
+
+function togglePause() {
+  if (!timer || timer.finished) return;
+  if (timer.paused) {
+    timer.endTs = Date.now() + timer.pausedLeft * 1000;
+    timer.paused = false;
+    timer.interval = setInterval(timerTick, 250);
+  } else {
+    timer.pausedLeft = remainingSecs();
+    timer.paused = true;
+    clearInterval(timer.interval);
+  }
+  render();
+}
 
 function extendTimer(secs) {
   if (!timer) return;
-  timer.endTs = Math.max(Date.now(), timer.endTs + secs * 1000);
-  timer.total = Math.max(0, timer.total + secs);
-  if (remainingSecs() > 0) {
-    timer.finished = false;
-    clearInterval(timer.interval);
-    timer.interval = setInterval(timerTick, 250);
+  if (timer.paused) {
+    timer.pausedLeft = Math.max(0, timer.pausedLeft + secs);
+    timer.total = Math.max(0, timer.total + secs);
+  } else {
+    timer.endTs = Math.max(Date.now(), timer.endTs + secs * 1000);
+    timer.total = Math.max(0, timer.total + secs);
+    if (remainingSecs() > 0) {
+      timer.finished = false;
+      clearInterval(timer.interval);
+      timer.interval = setInterval(timerTick, 250);
+    }
   }
   render();
 }
@@ -291,19 +359,27 @@ function finishCardio() {
   const doneSecs = timer ? (timer.finished ? total : Math.max(0, total - remainingSecs())) : 0;
   c.cardio.push({ round: c.round, modality: c.lastModality, seconds: doneSecs });
   stopTimer();
-  if (c.round >= 5) { finishSession(); return; }
+  if (c.round >= 5) { c.phase = 'effort'; save(); render(); return; }
   c.round += 1;
   c.phase = 'lift';
   initRound();
   save(); render();
 }
 
+function pickEffort(level) {
+  const c = S.current;
+  if (!c || c.phase !== 'effort') return;
+  c.effort = level;
+  finishSession();
+}
+
 function finishSession() {
   const c = S.current;
   S.sessions.push({
-    id: 's' + Date.now(),
+    id: 's' + Date.now() + '-' + S.sessions.length,
     ts: Date.now(),
     journeyId: c.journeyId, week: c.week, dayIndex: c.dayIndex, dayType: c.dayType,
+    readiness: c.readiness, effort: c.effort,
     sets: c.sets, cardio: c.cardio,
   });
   S.current = null;
@@ -326,12 +402,44 @@ function saveZone2(week, dayIndex, modality, minutes) {
   const j = journey();
   if (!j) { go('home'); return; }
   S.sessions.push({
-    id: 's' + Date.now(), ts: Date.now(),
+    id: 's' + Date.now() + '-' + S.sessions.length, ts: Date.now(),
     journeyId: j.id, week, dayIndex, dayType: 'ZONE2',
     zone2: { modality, minutes: clampNum(minutes, 5, 600, 60) },
   });
   save();
   go('home');
+}
+
+function saveSprint(week, dayIndex, modality, intervals, minutes) {
+  const j = journey();
+  if (!j) { go('home'); return; }
+  S.sessions.push({
+    id: 's' + Date.now() + '-' + S.sessions.length, ts: Date.now(),
+    journeyId: j.id, week, dayIndex, dayType: 'SPRINT',
+    sprint: { modality, intervals: clampNum(intervals, 1, 50, 8), minutes: clampNum(minutes, 5, 120, 20) },
+  });
+  save();
+  go('home');
+}
+
+function saveRest(week, dayIndex) {
+  const j = journey();
+  if (!j) { go('home'); return; }
+  S.sessions.push({
+    id: 's' + Date.now() + '-' + S.sessions.length, ts: Date.now(),
+    journeyId: j.id, week, dayIndex, dayType: 'REST',
+  });
+  save();
+  go('home');
+}
+
+function toggleZone2Check(week, i) {
+  const j = journey();
+  if (!j) return;
+  const key = j.id + ':' + week;
+  if (!Array.isArray(S.zone2Checks[key])) S.zone2Checks[key] = [false, false];
+  S.zone2Checks[key][i] = !S.zone2Checks[key][i];
+  save(); render();
 }
 
 function deleteSession(id) {
@@ -341,15 +449,29 @@ function deleteSession(id) {
   go('journal');
 }
 
+function moveRestDay(pos) {
+  const j = journey();
+  if (!j) return;
+  pos = clampNum(pos, 1, 7, 7) - 1;
+  const plan = j.weekPlan.filter((t) => t !== 'REST');
+  plan.splice(pos, 0, 'REST');
+  j.weekPlan = plan;
+  save(); render();
+}
+
 /* ---------- views ---------- */
 
 function render() {
   try {
     document.documentElement.style.setProperty('--font-scale', S.settings.fontScale);
     const views = {
-      home: vHome, workout: vWorkout, zone2: vZone2, summary: vSummary,
-      journal: vJournal, session: vSession, progress: vProgress,
+      home: vHome, workout: vWorkout, zone2: vZone2, sprint: vSprint, rest: vRest,
+      summary: vSummary, journal: vJournal, session: vSession, progress: vProgress,
       program: vProgram, settings: vSettings,
+      activation: () => vReading('Activation', ACTIVATION_IDEAS,
+        'Ten minutes before the first exercise. Raise the heart rate, move every joint you will load, and check in with yourself: sleep, niggles, energy.'),
+      deactivation: () => vReading('Deactivation', DEACTIVATION_IDEAS,
+        'Ten to fifteen minutes after the last cardio burst. Lower the heart rate, stretch what you trained, breathe, refuel. This marks the end of the session.'),
     };
     $app.innerHTML = (views[view.name] || vHome)() + navBar();
   } catch (e) {
@@ -363,7 +485,7 @@ function render() {
   }
 }
 
-window.addEventListener('error', (e) => {
+window.addEventListener('error', () => {
   // last-resort safety net: never leave a dead white screen
   if ($app && !$app.innerHTML) {
     view = { name: 'home' };
@@ -386,6 +508,24 @@ function dayBadge(type) {
   return `<span class="badge ${t.kind}">${esc(t.label)}</span>`;
 }
 
+function dayLabel(type) { return (DAY_TYPES[type] || { label: type }).label; }
+
+function zone2CardHTML(week) {
+  const j = journey();
+  const key = j.id + ':' + week;
+  const checks = Array.isArray(S.zone2Checks[key]) ? S.zone2Checks[key] : [false, false];
+  return `<div class="card">
+    <div class="row spread">
+      <h3>Zone 2 · Week ${week}</h3>
+      <div class="row" style="gap:0.5rem">
+        ${[0, 1].map((i) => `<button class="z2check ${checks[i] ? 'on' : ''}" onclick="toggleZone2Check(${week}, ${i})"
+          aria-label="Zone 2 session ${i + 1}">${checks[i] ? '✓' : (i + 1)}</button>`).join('')}
+      </div>
+    </div>
+    <p class="muted small">Two ~60 min easy-pace sessions per week, on top of training days.</p>
+  </div>`;
+}
+
 function vHome() {
   const j = journey();
   if (!j) {
@@ -399,21 +539,24 @@ function vHome() {
   if (S.current) {
     html += `<div class="card highlight">
       <h3>Session in progress</h3>
-      <p class="muted">Week ${S.current.week} · ${(DAY_TYPES[S.current.dayType] || {}).label || S.current.dayType} · Round ${S.current.round}/5</p>
+      <p class="muted">Week ${S.current.week} · ${dayLabel(S.current.dayType)} · Round ${S.current.round}/5</p>
       <button class="btn-primary mt" onclick="go('workout')">Resume</button>
       <button class="btn-ghost btn-big mt" onclick="abandonSession()">Discard</button>
     </div>`;
   } else if (next) {
     const type = dayType(j, next.dayIndex);
     const slots = slotsFor(j, next.week, type);
+    const detail = type === 'REST' ? '<p class="muted">Rest & recover — adaptation happens today.</p>'
+      : type === 'SPRINT' ? '<p class="muted">Sprint intervals — run, bike, row or SkiErg.</p>'
+      : type === 'ZONE2' ? '<p class="muted">Zone 2 — ~60 min easy pace</p>'
+      : `<p class="muted small">${slots.map((id, i) => `${'ABCDE'[i]} ${esc(ex(id).name)}`).join(' · ')}</p>`;
     html += `<div class="card highlight">
       <div class="row spread"><h3>Next up</h3>${dayBadge(type)}</div>
       <p class="big">Week ${next.week} · Day ${next.dayIndex + 1}</p>
-      ${type === 'ZONE2'
-        ? '<p class="muted">Zone 2 — ~60 min easy pace</p>'
-        : `<p class="muted small">${slots.map((id, i) => `${'ABCDE'[i]} ${esc(ex(id).name)}`).join(' · ')}</p>`}
+      ${detail}
       <button class="btn-primary mt" onclick="startSession(${next.week}, ${next.dayIndex})">Start</button>
     </div>`;
+    html += zone2CardHTML(next.week);
   } else {
     html += `<div class="card highlight"><h3>Journey complete</h3>
       <p class="muted">All ${j.weekCount} weeks done. Start a new journey in Settings.</p></div>`;
@@ -426,9 +569,8 @@ function vHome() {
     for (let d = 0; d < 7; d++) {
       const done = !!sessionFor(j.id, w, d);
       const isNext = next && next.week === w && next.dayIndex === d;
-      const t = DAY_TYPES[dayType(j, d)] || { label: '?' };
       days.push(`<div class="day ${done ? 'done' : ''} ${isNext ? 'next' : ''}" onclick="startSession(${w},${d})">
-        <span class="n">${d + 1}</span><span>${t.label.replace(' ', '')}</span></div>`);
+        <span class="n">${d + 1}</span><span>${dayLabel(dayType(j, d)).replace(' ', '')}</span></div>`);
     }
     html += `<div class="muted small">Week ${w}</div><div class="week-grid">${days.join('')}</div>`;
   }
@@ -447,12 +589,38 @@ function stepperHTML(i, field, value, unit, stepDown, stepUp) {
 function vWorkout() {
   const c = S.current;
   if (!c) return vHome();
-  const title = `W${c.week} · ${(DAY_TYPES[c.dayType] || {}).label || c.dayType}`;
+  const title = `W${c.week} · ${dayLabel(c.dayType)}`;
+
+  if (c.phase === 'readiness') {
+    return `<div class="topbar"><button onclick="go('home')" aria-label="back">←</button><span class="title">${title}</span></div>
+      <div class="card highlight">
+        <h3>How are you today?</h3>
+        <p class="muted small">This shapes the session — answer honestly.</p>
+      </div>
+      <div class="card readiness" onclick="pickReadiness('good')">
+        <div class="big">Good</div>
+        <p class="muted small">Program as planned. Last weights prefilled — aim to add a rep or a step.</p>
+      </div>
+      <div class="card readiness" onclick="pickReadiness('tired')">
+        <div class="big">Tired</div>
+        <p class="muted small">Order flips: the heavy anchor moves to the end (1× instead of 5×). A lighter day that still counts.</p>
+      </div>
+      <div class="card readiness" onclick="pickReadiness('sore')">
+        <div class="big">Sore</div>
+        <p class="muted small">Good to go — but C/D/E swap to moves you haven't done in a while, for a fresh stimulus.</p>
+      </div>
+      <button class="btn-ghost btn-big mt" onclick="abandonSession()">Cancel</button>`;
+  }
+
   const dots = [1, 2, 3, 4, 5].map((r) =>
     `<div class="dot ${r < c.round ? 'done' : ''} ${r === c.round ? 'now' : ''}"></div>`).join('');
 
   if (c.phase === 'lift') {
     if (!Array.isArray(c.roundEntries)) { initRound(); save(); }
+    const activationBanner = c.round === 1 && c.sets.length === 0
+      ? `<div class="banner">Activated? ~10 min easy cardio + dynamic moves before Round 1.
+          <button class="btn-small btn-ghost" onclick="go('activation')">Ideas →</button></div>`
+      : '';
     const blocks = c.roundEntries.map((en, i) => {
       const e = ex(en.ex);
       const isReps = e.measure === 'reps';
@@ -471,6 +639,7 @@ function vWorkout() {
           </div>
         </div>
         ${en.info ? `<p class="muted small how-to">${esc(e.desc || e.cue || 'No description yet.')}</p>` : ''}
+        ${en.fresh && en.weight === 0 && isReps ? `<p class="muted small fresh-hint">First time: think of your max weight, then go ~25% lighter.</p>` : ''}
         <div class="set-row">
           ${stepperHTML(i, 'amount', en.amount, isReps ? 'reps' : 'secs', isReps ? -1 : -5, isReps ? 1 : 5)}
           ${stepperHTML(i, 'weight', en.weight, 'kg', -S.settings.weightStep, S.settings.weightStep)}
@@ -481,9 +650,22 @@ function vWorkout() {
     return `<div class="topbar"><button onclick="go('home')" aria-label="back">←</button><span class="title">${title}</span>
         <span class="muted">Round ${c.round}/5</span></div>
       <div class="progress-dots">${dots}</div>
+      ${activationBanner}
       ${blocks}
       <button class="btn-primary" onclick="commitRound()">Log round → Cardio</button>
       <button class="btn-ghost btn-big mt" onclick="abandonSession()">Discard session</button>`;
+  }
+
+  if (c.phase === 'effort') {
+    return `<div class="topbar"><span class="title">${title}</span></div>
+      <div class="card highlight"><h3>How hard was that?</h3>
+        <p class="muted small">Tracked per session type — this is your intensity trend.</p></div>
+      <div class="card readiness" onclick="pickEffort('easy')"><div class="big">Easy</div>
+        <p class="muted small">Could have done clearly more.</p></div>
+      <div class="card readiness" onclick="pickEffort('solid')"><div class="big">Solid</div>
+        <p class="muted small">Worked hard, finished strong.</p></div>
+      <div class="card readiness" onclick="pickEffort('brutal')"><div class="big">Brutal</div>
+        <p class="muted small">At the limit — plan the recovery.</p></div>`;
   }
 
   // cardio phase
@@ -491,6 +673,7 @@ function vWorkout() {
   const secs = remainingSecs();
   const mm = Math.floor(secs / 60), ss = String(secs % 60).padStart(2, '0');
   const finished = timer && timer.finished;
+  const paused = timer && timer.paused;
   return `<div class="topbar"><span class="title">${title}</span><span class="muted">Cardio ${c.round}/5</span></div>
     <div class="progress-dots">${dots}</div>
     <div class="modality-grid">${CARDIO_MODALITIES.map((m) =>
@@ -499,13 +682,14 @@ function vWorkout() {
       ${noTimer
         ? `<div class="timer-clock">${S.settings.cardioMinutes}:00</div>
            <button class="btn-big" onclick="startTimer(S.settings.cardioMinutes * 60); render()">Start timer</button>`
-        : `<div class="timer-clock ${finished ? 'done' : ''}" id="clock">${finished ? 'DONE' : mm + ':' + ss}</div>
+        : `<div class="timer-clock ${finished ? 'done' : ''} ${paused ? 'paused' : ''}" id="clock">${finished ? 'DONE' : mm + ':' + ss}</div>
            <div class="row" style="justify-content:center">
+             ${finished ? '' : `<button onclick="togglePause()">${paused ? 'Resume' : 'Pause'}</button>`}
              <button onclick="extendTimer(60)">+1 min</button>
              <button onclick="extendTimer(-30)">−30 s</button>
            </div>`}
     </div>
-    <button class="btn-primary" onclick="finishCardio()">${c.round >= 5 ? 'Finish session' : 'Next round →'}</button>`;
+    <button class="btn-primary" onclick="finishCardio()">${c.round >= 5 ? 'Finish workout' : 'Next round →'}</button>`;
 }
 
 function updateClock() {
@@ -538,21 +722,96 @@ function vZone2() {
     </div>`;
 }
 
+function vSprint() {
+  const w = view.week, d = view.dayIndex;
+  if (!view.spMod) view.spMod = S.lastSprintMod || 'Run / Track';
+  if (!view.spInt) view.spInt = 8;
+  if (!view.spMin) view.spMin = 20;
+  return `<div class="topbar"><button onclick="go('home')" aria-label="back">←</button><span class="title">Sprint · Week ${w}</span></div>
+    <div class="banner">Warm up properly first — sprinting cold is how you get hurt.
+      <button class="btn-small btn-ghost" onclick="go('activation')">Ideas →</button></div>
+    <div class="card">
+      <h3>Modality</h3>
+      <div class="modality-grid">${SPRINT_MODALITIES.map((m) =>
+        `<button class="${view.spMod === m ? 'sel' : ''}" onclick="view.spMod='${m}';render()">${m}</button>`).join('')}</div>
+      <h3 class="mt">Sprints</h3>
+      <div class="row" style="justify-content:center">
+        <div class="stepper">
+          <button onclick="view.spInt=Math.max(1,view.spInt-1);render()" aria-label="fewer sprints">−</button>
+          <input class="val" inputmode="numeric" value="${view.spInt}" onchange="view.spInt=Math.round(clampNum(this.value,1,50,8));render()" aria-label="sprints">
+          <button onclick="view.spInt=Math.min(50,view.spInt+1);render()" aria-label="more sprints">+</button>
+          <span class="unit">×</span>
+        </div>
+      </div>
+      <h3 class="mt">Total time</h3>
+      <div class="row" style="justify-content:center">
+        <div class="stepper">
+          <button onclick="view.spMin=Math.max(5,view.spMin-5);render()" aria-label="less minutes">−</button>
+          <input class="val" inputmode="numeric" value="${view.spMin}" onchange="view.spMin=Math.round(clampNum(this.value,5,120,20));render()" aria-label="minutes">
+          <button onclick="view.spMin=Math.min(120,view.spMin+5);render()" aria-label="more minutes">+</button>
+          <span class="unit">min</span>
+        </div>
+      </div>
+      <button class="btn-primary mt" onclick="S.lastSprintMod=view.spMod;saveSprint(${w},${d},view.spMod,view.spInt,view.spMin)">Save sprint session</button>
+    </div>`;
+}
+
+function vRest() {
+  const w = view.week, d = view.dayIndex;
+  return `<div class="topbar"><button onclick="go('home')" aria-label="back">←</button><span class="title">Rest · Week ${w}</span></div>
+    <div class="card highlight">
+      <h3>Rest day</h3>
+      <p class="muted">This is where the adaptation happens. Muscles grow between sessions, not during them.</p>
+      <p class="muted small mt">Good uses of today: a long walk, stretching, sauna, early night, proper meals.</p>
+      <button class="btn-primary mt" onclick="saveRest(${w},${d})">Mark rest day done</button>
+    </div>
+    <div class="card">
+      <h3>Ideas</h3>
+      <p class="muted small">The deactivation page doubles as a rest-day menu — breathing, stretching doctrine, refuel.</p>
+      <button class="btn-big btn-ghost mt" onclick="go('deactivation')">Open deactivation page</button>
+    </div>`;
+}
+
+function vReading(title, ideas, intro) {
+  const backBtn = S.current
+    ? `<button class="btn-primary mb" onclick="go('workout')">← Back to session</button>`
+    : '';
+  return `<div class="topbar"><button onclick="go('${S.current ? 'workout' : 'program'}')" aria-label="back">←</button>
+      <span class="title">${title}</span></div>
+    ${backBtn}
+    <div class="card highlight"><p class="muted">${intro}</p></div>
+    ${ideas.map((it) => `<div class="card">
+      <h3>${esc(it.name)}</h3>
+      <p class="muted small">${esc(it.text)}</p>
+    </div>`).join('')}
+    ${backBtn}`;
+}
+
 function vSummary() {
   const s = S.sessions.find((x) => x.id === view.sessionId);
   if (!s) return vHome();
   return `<h1>Session done</h1>
     <div class="card">
-      <div class="row spread"><h3>W${s.week} · ${(DAY_TYPES[s.dayType] || {}).label || s.dayType}</h3>${dayBadge(s.dayType)}</div>
+      <div class="row spread"><h3>W${s.week} · ${dayLabel(s.dayType)}</h3>${dayBadge(s.dayType)}</div>
+      ${s.effort ? `<p class="muted small">Felt: <b>${esc(s.effort)}</b>${s.readiness ? ' · started: ' + esc(s.readiness) : ''}</p>` : ''}
       ${sessionDetailHTML(s)}
     </div>
-    <button class="btn-primary" onclick="go('home')">Home</button>`;
+    <div class="banner">Deactivate: 10–15 min stretch + breathing, then refuel within 20–30 min (protein + fluids).
+      <button class="btn-small btn-ghost" onclick="go('deactivation')">Guide →</button></div>
+    <button class="btn-primary mt" onclick="go('home')">Home</button>`;
 }
 
 function sessionDetailHTML(s) {
   if (s.dayType === 'ZONE2') {
     const z = s.zone2 || { modality: '?', minutes: 0 };
     return `<p class="big">${esc(z.modality)} · ${z.minutes} min</p>`;
+  }
+  if (s.dayType === 'SPRINT') {
+    const sp = s.sprint || { modality: '?', intervals: 0, minutes: 0 };
+    return `<p class="big">${esc(sp.modality)} · ${sp.intervals} sprints · ${sp.minutes} min</p>`;
+  }
+  if (s.dayType === 'REST') {
+    return '<p class="big">Recovery day ✓</p>';
   }
   const byEx = {};
   (s.sets || []).forEach((set) => {
@@ -571,7 +830,7 @@ function sessionDetailHTML(s) {
 function vJournal() {
   const items = S.sessions.slice().reverse().map((s) =>
     `<div class="session-item" onclick="go('session', {sessionId: '${s.id}'})">
-      <div><b>W${s.week} · ${(DAY_TYPES[s.dayType] || {}).label || s.dayType}</b><br><span class="muted small">${fmtDate(s.ts)}</span></div>
+      <div><b>W${s.week} · ${dayLabel(s.dayType)}</b><br><span class="muted small">${fmtDate(s.ts)}${s.effort ? ' · ' + esc(s.effort) : ''}</span></div>
       ${dayBadge(s.dayType)}
     </div>`).join('');
   return `<h1>Journal</h1><div class="card">${items || '<p class="muted">No sessions yet. Your logged workouts will appear here.</p>'}</div>`;
@@ -582,10 +841,17 @@ function vSession() {
   if (!s) return vJournal();
   return `<div class="topbar"><button onclick="go('journal')" aria-label="back">←</button><span class="title">${fmtDate(s.ts)}</span></div>
     <div class="card">
-      <div class="row spread"><h3>W${s.week} · ${(DAY_TYPES[s.dayType] || {}).label || s.dayType}</h3>${dayBadge(s.dayType)}</div>
+      <div class="row spread"><h3>W${s.week} · ${dayLabel(s.dayType)}</h3>${dayBadge(s.dayType)}</div>
+      ${s.effort ? `<p class="muted small">Felt: <b>${esc(s.effort)}</b>${s.readiness ? ' · started: ' + esc(s.readiness) : ''}</p>` : ''}
       ${sessionDetailHTML(s)}
     </div>
     <button class="btn-danger btn-big" onclick="deleteSession('${s.id}')">Delete session</button>`;
+}
+
+function effortChip(e) {
+  const map = { easy: ['E', 'easy'], solid: ['S', 'solid'], brutal: ['B', 'brutal'] };
+  const [letter, cls] = map[e] || ['·', ''];
+  return `<span class="effort-chip ${cls}" title="${e}">${letter}</span>`;
 }
 
 function vProgress() {
@@ -606,6 +872,16 @@ function vProgress() {
     });
     chart = trendSVG(points) + `<p class="muted small center">max weight per session (kg) · latest: ${points.length ? points[points.length - 1].maxW + ' kg × ' + points[points.length - 1].topAmount : '—'}</p>`;
   }
+
+  // effort trend per session kind
+  const kinds = [['legs', 'Legs'], ['upper', 'Upper'], ['mixed', 'Mixed'], ['sprint', 'Sprint']];
+  const effortRows = kinds.map(([kind, label]) => {
+    const efforts = S.sessions
+      .filter((s) => ((DAY_TYPES[s.dayType] || {}).kind === kind) && s.effort)
+      .slice(-6).map((s) => effortChip(s.effort)).join(' ');
+    return efforts ? `<div class="set-row"><span>${label}</span><span>${efforts}</span></div>` : '';
+  }).join('');
+
   return `<h1>Progress</h1>
     <div class="card">
       ${loggedIds.length ? `<select onchange="view.exId=this.value;render()" aria-label="choose exercise">
@@ -613,10 +889,14 @@ function vProgress() {
       </select>` : ''}
       <div class="trend mt">${chart}</div>
     </div>
+    ${effortRows ? `<div class="card"><h3>Effort by session type</h3>
+      <p class="muted small">Last sessions, oldest → newest. E easy · S solid · B brutal.</p>${effortRows}</div>` : ''}
     <div class="card">
-      <h3>Zone 2</h3>
-      ${S.sessions.filter((s) => s.dayType === 'ZONE2').slice(-6).reverse().map((s) =>
-        `<div class="set-row"><span>${fmtDate(s.ts)}</span><span class="muted">${esc((s.zone2 || {}).modality || '?')} · ${(s.zone2 || {}).minutes || 0} min</span></div>`).join('') || '<p class="muted">None yet.</p>'}
+      <h3>Sprints & Zone 2</h3>
+      ${S.sessions.filter((s) => s.dayType === 'SPRINT').slice(-4).reverse().map((s) =>
+        `<div class="set-row"><span>${fmtDate(s.ts)}</span><span class="muted">${esc((s.sprint || {}).modality || '?')} · ${(s.sprint || {}).intervals || 0}× · ${(s.sprint || {}).minutes || 0} min</span></div>`).join('') || '<p class="muted small">No sprint days yet.</p>'}
+      ${S.sessions.filter((s) => s.dayType === 'ZONE2').slice(-4).reverse().map((s) =>
+        `<div class="set-row"><span>${fmtDate(s.ts)}</span><span class="muted">${esc((s.zone2 || {}).modality || '?')} · ${(s.zone2 || {}).minutes || 0} min</span></div>`).join('')}
     </div>`;
 }
 
@@ -646,21 +926,32 @@ function vProgram() {
   if (!j) return vHome();
   if (!view.tab) view.tab = 'days';
 
-  let body = view.tab === 'library' ? programLibraryHTML() : programDaysHTML(j);
+  const body = view.tab === 'library' ? programLibraryHTML()
+    : view.tab === 'activation' ? vReadingInline(ACTIVATION_IDEAS)
+    : view.tab === 'deactivation' ? vReadingInline(DEACTIVATION_IDEAS)
+    : programDaysHTML(j);
 
+  const tabs = [['days', 'Days'], ['library', 'Library'], ['activation', 'Activation'], ['deactivation', 'Deactivation']];
   return `<h1>Program</h1>
-    <div class="row mb tabs">
-      <button class="btn-small ${view.tab === 'days' ? '' : 'btn-ghost'}" onclick="view.tab='days';render()">Training days</button>
-      <button class="btn-small ${view.tab === 'library' ? '' : 'btn-ghost'}" onclick="view.tab='library';render()">Exercise library</button>
+    <div class="row wrap mb tabs">
+      ${tabs.map(([t, l]) => `<button class="btn-small ${view.tab === t ? '' : 'btn-ghost'}" onclick="view.tab='${t}';render()">${l}</button>`).join('')}
     </div>
     ${body}`;
 }
 
+function vReadingInline(ideas) {
+  return ideas.map((it) => `<div class="card">
+    <h3>${esc(it.name)}</h3>
+    <p class="muted small">${esc(it.text)}</p>
+  </div>`).join('');
+}
+
 function programDaysHTML(j) {
   if (!view.block) view.block = 'early';
-  if (!view.day || !j.blocks[view.block][view.day]) view.day = j.weekPlan.find((t) => t !== 'ZONE2') || 'LEGS1';
-  const dayKeys = j.weekPlan.filter((t) => t !== 'ZONE2');
-  const slots = j.blocks[view.block][view.day] || [];
+  const dayKeys = j.weekPlan.filter((t) => is52Day(t));
+  if (!view.day || !dayKeys.includes(view.day)) view.day = dayKeys[0];
+  const slots = (j.blocks[view.block] || {})[view.day] || [];
+  const restPos = j.weekPlan.indexOf('REST') + 1;
 
   const slotRows = slots.map((exId, i) => {
     const e = ex(exId);
@@ -697,10 +988,18 @@ function programDaysHTML(j) {
     </div>
     <div class="row wrap mb">
       ${dayKeys.map((t) => `<button class="btn-small ${view.day === t ? '' : 'btn-ghost'}"
-        onclick="view.day='${t}';view.editSlot=null;render()">${(DAY_TYPES[t] || {}).label || t}</button>`).join('')}
+        onclick="view.day='${t}';view.editSlot=null;render()">${dayLabel(t)}</button>`).join('')}
     </div>
     ${editHTML}
     <div class="card">${slotRows || '<p class="muted">No exercises configured for this day.</p>'}</div>
+    <div class="card">
+      <h3>Week layout</h3>
+      <label class="field" for="restDaySel">Rest day position</label>
+      <select id="restDaySel" onchange="moveRestDay(this.value)">
+        ${[1, 2, 3, 4, 5, 6, 7].map((p) => `<option value="${p}" ${p === restPos ? 'selected' : ''}>Day ${p}</option>`).join('')}
+      </select>
+      <p class="muted small mt">Days keep their order; the rest day slides to where your week needs it.</p>
+    </div>
     <div class="card">
       <h3>Add exercise to library</h3>
       <label class="field" for="newExName">Name</label><input type="text" id="newExName">

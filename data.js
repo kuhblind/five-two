@@ -12,12 +12,37 @@ const ZONE2_MODALITIES = ['Bike', 'Run', 'Row', 'Walk / Hike', 'SkiErg', 'Swim']
 const DAY_TYPES = {
   LEGS1:  { label: 'Legs 1',  kind: 'legs' },
   UPPER1: { label: 'Upper 1', kind: 'upper' },
-  MIXED1: { label: 'Mixed 1', kind: 'mixed' },
+  SPRINT: { label: 'Sprint',  kind: 'sprint' },
   LEGS2:  { label: 'Legs 2',  kind: 'legs' },
   UPPER2: { label: 'Upper 2', kind: 'upper' },
+  MIXED1: { label: 'Mixed',   kind: 'mixed' },
+  REST:   { label: 'Rest',    kind: 'rest' },
+  // legacy types (v1 journeys / old journal entries)
   MIXED2: { label: 'Mixed 2', kind: 'mixed' },
   ZONE2:  { label: 'Zone 2',  kind: 'zone2' },
 };
+
+const SPRINT_MODALITIES = ['Run / Track', 'Bike', 'Row', 'SkiErg'];
+
+/* Activation & deactivation repositories — paraphrased ideas in the spirit of
+   the Intelligent Fitness bolt-ons. ~10 min before, ~10-15 min after. */
+const ACTIVATION_IDEAS = [
+  { name: 'Easy cardio, 10 min', text: 'Bike, row or jog at conversational pace. You are raising the heart rate and telling the body work is coming — not training yet.' },
+  { name: 'Throw a ball around', text: 'Rugby ball, baseball, anything. Coordination, fun, and the moment to ask yourself: how did I sleep, any niggles, what do I want from today?' },
+  { name: 'Skipping', text: '2–3 easy minutes. Rhythm, calves, coordination — a favourite pre-workout switch-on.' },
+  { name: 'Dynamic mobility', text: 'Arm circles, leg swings, hip openers, torso rotations. Move every joint you are about to load through its range.' },
+  { name: 'Pedal to standing', text: 'From the pike position (hands flat, hips high), pedal the feet one at a time, walk the feet toward the hands, and roll up to standing slowly. Wakes the calves and hamstrings.' },
+  { name: 'Plank → pike → cobra', text: 'From a forearm plank, lift the hips to a pike, lower them until they hover, then come forward into a gentle cobra looking slightly up. Spine and abdominals ready.' },
+  { name: 'Agility bursts', text: 'Sidesteps, a few light accelerations with controlled deceleration, ten seconds of fast feet. Prime the nervous system, especially before sprint or plyo work.' },
+];
+
+const DEACTIVATION_IDEAS = [
+  { name: 'Bring the heart rate down', text: 'Two or three minutes of easy movement — slow walk, light multidirectional steps. You are switching out of activity mode.' },
+  { name: 'Stretch what you trained', text: 'Hold each stretch to a comfortable discomfort, wait for it to fade, then add roughly 10% more and hold again before easing off slowly. Control the exit as much as the entry — stretching marks the end of the session.' },
+  { name: 'Breathing reset', text: 'Sit cross-legged, elbows on knees. Breathe into the lower third of the lungs, exhale fully. Ten to fifteen slow breaths — near-meditative, heart rate visibly drops.' },
+  { name: 'Ten-second reactivation', text: 'Finish with a ten-second sprint on the spot. It sounds odd after calming down, but it leaves you invigorated for the rest of the day.' },
+  { name: 'Refuel window', text: 'The best time to refuel is the 20–30 minutes after training: protein plus fluids. Prepare it before the session so it is waiting for you.' },
+];
 
 // measure: 'reps' (log reps + weight) | 'secs' (log seconds + weight)
 // pattern: movement family -> pictogram in the Library and workout screens
@@ -229,7 +254,7 @@ const SEED_BLOCKS = {
   },
 };
 
-const WEEK_PLAN = ['LEGS1', 'UPPER1', 'MIXED1', 'LEGS2', 'UPPER2', 'MIXED2', 'ZONE2'];
+const WEEK_PLAN = ['LEGS1', 'UPPER1', 'SPRINT', 'LEGS2', 'UPPER2', 'MIXED1', 'REST'];
 
 function seedState() {
   const exercises = {};
@@ -248,6 +273,7 @@ function seedState() {
     }],
     activeJourneyId: 'j1',
     sessions: [],
+    zone2Checks: {},
     current: null,
   };
 }

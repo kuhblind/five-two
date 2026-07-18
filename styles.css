@@ -225,6 +225,55 @@ label.field { display: block; margin: 0.8rem 0 0.3rem; color: var(--muted); font
 .badge.upper { color: #ff9f8f; }
 .badge.mixed { color: #f0b429; }
 .badge.zone2 { color: #8fe3b0; }
+.badge.sprint { color: #ffb3d9; }
+.badge.rest { color: #8fe3b0; }
+
+/* in-session banners (activation / deactivation / refuel) */
+.banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+  background: rgba(240, 180, 65, 0.09);
+  border: 1px solid rgba(240, 180, 65, 0.3);
+  border-radius: 12px;
+  padding: 0.7rem 0.9rem;
+  margin-bottom: 0.9rem;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.banner button { flex-shrink: 0; }
+
+/* readiness / effort choice cards */
+.card.readiness { cursor: pointer; transition: border-color 150ms ease-out; }
+.card.readiness:active { border-color: var(--accent); }
+
+.fresh-hint {
+  margin: 0.4rem 0 0.1rem; padding: 0.4rem 0.7rem;
+  background: rgba(240, 180, 65, 0.06); border-radius: 8px;
+}
+
+/* effort chips */
+.effort-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.7rem; height: 1.7rem; border-radius: 8px;
+  font-size: 0.8rem; font-weight: 800; margin-left: 3px;
+  border: 1px solid var(--border);
+}
+.effort-chip.easy { color: #8fe3b0; border-color: #3d6b4f; }
+.effort-chip.solid { color: var(--accent); border-color: #7a5f1c; }
+.effort-chip.brutal { color: #ff9f8f; border-color: #7a3b36; }
+
+/* zone 2 weekly checkmarks */
+.z2check {
+  width: 3rem; height: 3rem; border-radius: 12px;
+  font-size: 1.2rem; font-weight: 800; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted);
+}
+.z2check.on {
+  background: linear-gradient(160deg, #f7c64a, #e0a416);
+  border-color: #c9930f; color: var(--on-accent);
+}
+
+.timer-clock.paused { opacity: 0.5; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }

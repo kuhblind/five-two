@@ -1,7 +1,7 @@
 /* storage.js — versioned localStorage persistence + normalization + export/import */
 
 const STORE_KEY = 'fivetwo.state';
-const STORE_VERSION = 1;
+const STORE_VERSION = 2;
 
 let storageWarned = false;
 
@@ -32,8 +32,18 @@ function saveState(state) {
 }
 
 function migrate(state) {
-  // future migrations bump STORE_VERSION and transform here
   if (!state.version) state.version = 1;
+  // v1 -> v2: week restructured to 2x legs, 2x upper, 1x sprint, 1x mixed, 1x rest;
+  // Zone 2 moved out of the schedule into weekly checkmarks.
+  if (state.version < 2) {
+    (state.journeys || []).forEach((j) => {
+      j.weekPlan = ['LEGS1', 'UPPER1', 'SPRINT', 'LEGS2', 'UPPER2', 'MIXED1', 'REST'];
+    });
+    state.zone2Checks = {};
+    // an in-progress v1 session doesn't map onto the new phase machine — drop it
+    state.current = null;
+    state.version = 2;
+  }
   return state;
 }
 
@@ -51,14 +61,16 @@ function normalizeState(state) {
   if (!state.exercises || typeof state.exercises !== 'object') state.exercises = {};
   if (!Array.isArray(state.journeys)) state.journeys = [];
   if (!Array.isArray(state.sessions)) state.sessions = [];
+  if (!state.zone2Checks || typeof state.zone2Checks !== 'object') state.zone2Checks = {};
 
   state.journeys = state.journeys.filter((j) => j && j.id && j.blocks && Array.isArray(j.weekPlan) && j.weekPlan.length === 7);
   state.journeys.forEach((j) => {
     if (!(j.weekCount >= 1 && j.weekCount <= 12)) j.weekCount = 6;
+    if (!j.weekPlan.includes('REST')) j.weekPlan[6] = 'REST';
     ['early', 'late'].forEach((b) => {
       if (!j.blocks[b] || typeof j.blocks[b] !== 'object') j.blocks[b] = {};
       j.weekPlan.forEach((t) => {
-        if (t === 'ZONE2') return;
+        if (['ZONE2', 'REST', 'SPRINT'].includes(t)) return;
         if (!Array.isArray(j.blocks[b][t])) j.blocks[b][t] = [];
         j.blocks[b][t] = j.blocks[b][t].slice(0, 5);
       });
@@ -75,7 +87,7 @@ function normalizeState(state) {
   const c = state.current;
   if (c) {
     const okShape = c.journeyId && state.journeys.find((j) => j.id === c.journeyId)
-      && c.round >= 1 && c.round <= 5 && ['lift', 'cardio'].includes(c.phase)
+      && c.round >= 1 && c.round <= 5 && ['readiness', 'lift', 'cardio', 'effort'].includes(c.phase)
       && Array.isArray(c.sets) && Array.isArray(c.cardio);
     if (!okShape) state.current = null;
   }
