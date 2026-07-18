@@ -48,7 +48,24 @@ function patternIcon(pattern, size) {
 
 const $app = document.getElementById('app');
 
-function save() { saveState(S); }
+let saveTimer = null;
+
+function save() {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  saveState(S);
+}
+
+/* high-frequency inputs (stepper taps) coalesce writes; anything that must
+   persist immediately calls save(), which also flushes a pending write */
+function scheduleSave() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { saveTimer = null; saveState(S); }, 300);
+}
+
+window.addEventListener('pagehide', () => { if (saveTimer) save(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && saveTimer) save();
+});
 
 function go(name, params) { view = Object.assign({ name }, params || {}); render(); }
 
@@ -71,11 +88,6 @@ function toggleTravelMode() {
   save(); render();
 }
 
-function localDate() {
-  const d = new Date();
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-
 function toggleBigThree() {
   const key = localDate();
   if (S.bigThree[key]) delete S.bigThree[key];
@@ -86,9 +98,7 @@ function toggleBigThree() {
 function bigThreeWeekCount() {
   let n = 0;
   for (let i = 0; i < 7; i++) {
-    const d = new Date(Date.now() - i * 86400000);
-    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    if (S.bigThree[key]) n++;
+    if (S.bigThree[localDate(new Date(Date.now() - i * 86400000))]) n++;
   }
   return n;
 }
@@ -111,10 +121,18 @@ function sessionFor(jid, week, dayIndex) {
   return S.sessions.find((s) => s.journeyId === jid && s.week === week && s.dayIndex === dayIndex);
 }
 
-function nextSlot(j) {
+/* one pass over sessions -> O(1) done-lookups for the 42-cell grid */
+function doneDaySet(j) {
+  const done = new Set();
+  S.sessions.forEach((s) => { if (s.journeyId === j.id) done.add(s.week + ':' + s.dayIndex); });
+  return done;
+}
+
+function nextSlot(j, done) {
+  done = done || doneDaySet(j);
   for (let w = 1; w <= j.weekCount; w++) {
     for (let d = 0; d < 7; d++) {
-      if (!sessionFor(j.id, w, d)) return { week: w, dayIndex: d };
+      if (!done.has(w + ':' + d)) return { week: w, dayIndex: d };
     }
   }
   return null;
@@ -142,13 +160,6 @@ function lastLogged(exId) {
     }
   }
   return null;
-}
-
-function lastLoggedTs(exId) {
-  for (let i = S.sessions.length - 1; i >= 0; i--) {
-    if ((S.sessions[i].sets || []).some((x) => x.ex === exId)) return S.sessions[i].ts || 0;
-  }
-  return -1; // never done
 }
 
 function bucketFloor(bucket) {
@@ -202,7 +213,6 @@ function startSession(week, dayIndex) {
   if (sessionFor(j.id, week, dayIndex)) {
     if (!confirm('This day is already logged. Log it again?')) return;
   }
-  if (type === 'ZONE2') { go('zone2', { week, dayIndex }); return; }
   if (type === 'REST') { go('rest', { week, dayIndex }); return; }
   if (type === 'SPRINT') { go('sprint', { week, dayIndex }); return; }
 
@@ -228,17 +238,24 @@ function startSession(week, dayIndex) {
 
 /* Sore: keep the A/B anchors, but where a C/D/E exercise was trained recently
    and a same-group alternative is staler (or never done), swap it in for
-   fresh stimulus. */
+   fresh stimulus. Travel-only exercises stay out of the gym-day pool (in
+   travel mode the substitution map handles them after this runs). */
 function sorenessSwap(slots) {
+  const lastTs = new Map();
+  S.sessions.forEach((s) => {
+    (s.sets || []).forEach((x) => { lastTs.set(x.ex, s.ts || 0); });
+  });
+  const tsOf = (id) => (lastTs.has(id) ? lastTs.get(id) : -1);
   const out = slots.slice();
   for (let i = 2; i < out.length; i++) {
-    const curTs = lastLoggedTs(out[i]);
+    const curTs = tsOf(out[i]);
     if (curTs < 0) continue; // never done -> already novel
     const group = ex(out[i]).group;
     let best = null, bestTs = curTs;
     Object.values(S.exercises).forEach((e) => {
       if (e.group !== group || out.includes(e.id)) return;
-      const ts = lastLoggedTs(e.id);
+      if (e.travel && !S.settings.travelMode) return;
+      const ts = tsOf(e.id);
       if (ts < bestTs) { best = e.id; bestTs = ts; }
     });
     if (best) out[i] = best;
@@ -277,7 +294,7 @@ function initRound() {
       amount: prev ? prev.amount : bucketFloor(e.bucket),
       weight: prev ? prev.weight : 0,
       fresh: !prev,
-      done: false,
+      skipped: false,
       info: false,
     };
   });
@@ -292,7 +309,7 @@ function adjustEntry(i, field, delta) {
   if (!en) return;
   const hi = field === 'weight' ? 500 : 999;
   en[field] = clampNum(Math.round((en[field] + delta) * 100) / 100, 0, hi, 0);
-  save(); render();
+  scheduleSave(); render();
 }
 
 function setEntry(i, field, value) {
@@ -300,14 +317,14 @@ function setEntry(i, field, value) {
   if (!en) { render(); return; }
   const hi = field === 'weight' ? 500 : 999;
   en[field] = clampNum(value, 0, hi, en[field]);
-  save(); render();
+  scheduleSave(); render();
 }
 
-function toggleEntryDone(i) {
+function toggleEntrySkip(i) {
   const en = entryAt(i);
   if (!en) return;
-  en.done = !en.done;
-  save(); render();
+  en.skipped = !en.skipped;
+  scheduleSave(); render();
 }
 
 function toggleEntryInfo(i) {
@@ -320,7 +337,9 @@ function toggleEntryInfo(i) {
 function commitRound() {
   const c = S.current;
   if (!c || c.phase !== 'lift' || !Array.isArray(c.roundEntries)) return;
+  // skipped exercises and zero-amount entries are not phantom-logged
   c.roundEntries.forEach((en) => {
+    if (en.skipped || !(en.amount > 0)) return;
     c.sets.push({ round: c.round, ex: en.ex, amount: en.amount, weight: en.weight });
   });
   c.roundEntries = null;
@@ -342,10 +361,16 @@ function timerTick() {
   if (view.name === 'workout') updateClock();
 }
 
+function armTick() {
+  if (!timer) return;
+  if (timer.interval) clearInterval(timer.interval);
+  timer.interval = setInterval(timerTick, 250);
+}
+
 function startTimer(totalSecs) {
   stopTimer();
   timer = { endTs: Date.now() + totalSecs * 1000, total: totalSecs, finished: false, paused: false, pausedLeft: 0 };
-  timer.interval = setInterval(timerTick, 250);
+  armTick();
 }
 
 function stopTimer() { if (timer && timer.interval) clearInterval(timer.interval); timer = null; }
@@ -361,7 +386,7 @@ function togglePause() {
   if (timer.paused) {
     timer.endTs = Date.now() + timer.pausedLeft * 1000;
     timer.paused = false;
-    timer.interval = setInterval(timerTick, 250);
+    armTick();
   } else {
     timer.pausedLeft = remainingSecs();
     timer.paused = true;
@@ -380,8 +405,7 @@ function extendTimer(secs) {
     timer.total = Math.max(0, timer.total + secs);
     if (remainingSecs() > 0) {
       timer.finished = false;
-      clearInterval(timer.interval);
-      timer.interval = setInterval(timerTick, 250);
+      armTick();
     }
   }
   render();
@@ -416,11 +440,16 @@ function pickEffort(level) {
   finishSession();
 }
 
+function pushSession(fields) {
+  const rec = Object.assign({ id: 's' + Date.now() + '-' + S.sessions.length, ts: Date.now() }, fields);
+  S.sessions.push(rec);
+  save();
+  return rec;
+}
+
 function finishSession() {
   const c = S.current;
-  S.sessions.push({
-    id: 's' + Date.now() + '-' + S.sessions.length,
-    ts: Date.now(),
+  const rec = pushSession({
     journeyId: c.journeyId, week: c.week, dayIndex: c.dayIndex, dayType: c.dayType,
     readiness: c.readiness, effort: c.effort, travel: c.travel || false,
     sets: c.sets, cardio: c.cardio,
@@ -429,7 +458,7 @@ function finishSession() {
   releaseWake();
   stopTimer();
   save();
-  go('summary', { sessionId: S.sessions[S.sessions.length - 1].id });
+  go('summary', { sessionId: rec.id });
 }
 
 function abandonSession() {
@@ -441,38 +470,20 @@ function abandonSession() {
   go('home');
 }
 
-function saveZone2(week, dayIndex, modality, minutes) {
-  const j = journey();
-  if (!j) { go('home'); return; }
-  S.sessions.push({
-    id: 's' + Date.now() + '-' + S.sessions.length, ts: Date.now(),
-    journeyId: j.id, week, dayIndex, dayType: 'ZONE2',
-    zone2: { modality, minutes: clampNum(minutes, 5, 600, 60) },
-  });
-  save();
-  go('home');
-}
-
 function saveSprint(week, dayIndex, modality, intervals, minutes) {
   const j = journey();
   if (!j) { go('home'); return; }
-  S.sessions.push({
-    id: 's' + Date.now() + '-' + S.sessions.length, ts: Date.now(),
+  pushSession({
     journeyId: j.id, week, dayIndex, dayType: 'SPRINT',
     sprint: { modality, intervals: clampNum(intervals, 1, 50, 8), minutes: clampNum(minutes, 5, 120, 20) },
   });
-  save();
   go('home');
 }
 
 function saveRest(week, dayIndex) {
   const j = journey();
   if (!j) { go('home'); return; }
-  S.sessions.push({
-    id: 's' + Date.now() + '-' + S.sessions.length, ts: Date.now(),
-    journeyId: j.id, week, dayIndex, dayType: 'REST',
-  });
-  save();
+  pushSession({ journeyId: j.id, week, dayIndex, dayType: 'REST' });
   go('home');
 }
 
@@ -508,7 +519,7 @@ function render() {
   try {
     document.documentElement.style.setProperty('--font-scale', S.settings.fontScale);
     const views = {
-      home: vHome, workout: vWorkout, zone2: vZone2, sprint: vSprint, rest: vRest,
+      home: vHome, workout: vWorkout, sprint: vSprint, rest: vRest,
       summary: vSummary, journal: vJournal, session: vSession, progress: vProgress,
       program: vProgram, settings: vSettings,
       activation: () => vReading('Activation', ACTIVATION_IDEAS,
@@ -614,7 +625,8 @@ function vHome() {
       <p class="muted">Start fresh below.</p>
       <button class="btn-primary mt" onclick="resetAll()">Set up new journey</button></div>`;
   }
-  const next = nextSlot(j);
+  const done = doneDaySet(j);
+  const next = nextSlot(j, done);
   let html = `<h1>5+2 <span class="muted small">· ${esc(j.name)}</span></h1>`;
 
   if (S.current) {
@@ -628,8 +640,7 @@ function vHome() {
     const type = dayType(j, next.dayIndex);
     const slots = slotsFor(j, next.week, type);
     const detail = type === 'REST' ? '<p class="muted">Rest & recover — adaptation happens today.</p>'
-      : type === 'SPRINT' ? '<p class="muted">Sprint intervals — run, bike, row or SkiErg.</p>'
-      : type === 'ZONE2' ? '<p class="muted">Zone 2 — ~60 min easy pace</p>'
+      : type === 'SPRINT' ? '<p class="muted">Sprint intervals — run, bike, row or stepper.</p>'
       : `<p class="muted small">${slots.map((id, i) => `${'ABCDE'[i]} ${esc(ex(travelEx(id)).name)}`).join(' · ')}</p>`;
     html += `<div class="card highlight">
       <div class="row spread"><h3>Next up</h3>${dayBadge(type)}</div>
@@ -650,9 +661,9 @@ function vHome() {
   for (let w = 1; w <= j.weekCount; w++) {
     const days = [];
     for (let d = 0; d < 7; d++) {
-      const done = !!sessionFor(j.id, w, d);
+      const isDone = done.has(w + ':' + d);
       const isNext = next && next.week === w && next.dayIndex === d;
-      days.push(`<div class="day ${done ? 'done' : ''} ${isNext ? 'next' : ''}" onclick="startSession(${w},${d})">
+      days.push(`<div class="day ${isDone ? 'done' : ''} ${isNext ? 'next' : ''}" onclick="startSession(${w},${d})">
         <span class="n">${d + 1}</span><span>${dayLabel(dayType(j, d)).replace(' ', '')}</span></div>`);
     }
     html += `<div class="muted small">Week ${w}</div><div class="week-grid">${days.join('')}</div>`;
@@ -707,18 +718,18 @@ function vWorkout() {
     const blocks = c.roundEntries.map((en, i) => {
       const e = ex(en.ex);
       const isReps = e.measure === 'reps';
-      return `<div class="card exercise-block ${en.done ? 'done-block' : ''}">
+      return `<div class="card exercise-block ${en.skipped ? 'done-block' : ''}">
         <div class="row spread">
           <div class="row exhead">
             <span class="pattern-ico">${patternIcon(e.pattern, 34)}</span>
             <div>
               <div class="exname">${'ABCDE'[i]} · ${esc(e.name)}</div>
-              <div class="target">${e.bucket ? 'target ' + e.bucket + ' reps' : 'time-based'}</div>
+              <div class="target">${en.skipped ? 'skipped — will not be logged' : (e.bucket ? 'target ' + e.bucket + ' reps' : 'time-based')}</div>
             </div>
           </div>
           <div class="row" style="gap:0.4rem">
             <button class="btn-small btn-ghost" onclick="toggleEntryInfo(${i})" aria-label="how to do this exercise">?</button>
-            <button class="btn-small ${en.done ? '' : 'btn-ghost'}" onclick="toggleEntryDone(${i})" aria-label="mark done">✓</button>
+            <button class="btn-small ${en.skipped ? '' : 'btn-ghost'}" onclick="toggleEntrySkip(${i})" aria-label="skip this exercise">${en.skipped ? 'Undo' : 'Skip'}</button>
           </div>
         </div>
         ${en.info ? `<p class="muted small how-to">${esc(e.desc || e.cue || 'No description yet.')}</p>` : ''}
@@ -783,28 +794,6 @@ function updateClock() {
   const secs = remainingSecs();
   if (timer.finished) { el.textContent = 'DONE'; el.classList.add('done'); return; }
   el.textContent = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
-}
-
-function vZone2() {
-  const w = view.week, d = view.dayIndex;
-  if (!view.z2mod) view.z2mod = S.lastZ2Mod || 'Bike';
-  if (!view.z2min) view.z2min = 60;
-  return `<div class="topbar"><button onclick="go('home')" aria-label="back">←</button><span class="title">Zone 2 · Week ${w}</span></div>
-    <div class="card">
-      <h3>Modality</h3>
-      <div class="modality-grid">${ZONE2_MODALITIES.map((m) =>
-        `<button class="${view.z2mod === m ? 'sel' : ''}" onclick="view.z2mod='${m}';render()">${m}</button>`).join('')}</div>
-      <h3 class="mt">Duration</h3>
-      <div class="row" style="justify-content:center" >
-        <div class="stepper">
-          <button onclick="view.z2min=Math.max(10,view.z2min-5);render()" aria-label="less minutes">−</button>
-          <input class="val" inputmode="numeric" value="${view.z2min}" onchange="view.z2min=Math.round(clampNum(this.value,5,600,60));render()" aria-label="minutes">
-          <button onclick="view.z2min=Math.min(600,view.z2min+5);render()" aria-label="more minutes">+</button>
-          <span class="unit">min</span>
-        </div>
-      </div>
-      <button class="btn-primary mt" onclick="S.lastZ2Mod=view.z2mod;saveZone2(${w},${d},view.z2mod,view.z2min)">Save Zone 2</button>
-    </div>`;
 }
 
 function vSprint() {
@@ -1191,7 +1180,7 @@ function vSettings() {
         <button class="btn-big grow btn-ghost" onclick="document.getElementById('importFile').click()">Import</button>
       </div>
       <input type="file" id="importFile" accept="application/json" style="display:none"
-        onchange="importJSON(this.files[0], (err, st) => { if (err) alert('Import failed: ' + err.message); else { S = st; view={name:'home'}; render(); } })">
+        onchange="importJSON(this.files[0], (err, st) => { if (err) alert('Import failed: ' + err.message); else { S = st; stopTimer(); releaseWake(); view={name:'home'}; render(); } })">
     </div>
     <div class="card">
       <h3>Danger zone</h3>
@@ -1215,6 +1204,8 @@ function newJourney() {
   S.journeys.push(nj);
   S.activeJourneyId = nj.id;
   S.current = null;
+  stopTimer();
+  releaseWake();
   save();
   go('home');
 }
@@ -1223,6 +1214,8 @@ function resetAll() {
   if (!confirm('Delete ALL data — journeys, sessions, everything?')) return;
   if (!confirm('Really sure? Consider exporting a backup first.')) return;
   S = seedState();
+  stopTimer();
+  releaseWake();
   save();
   go('home');
 }

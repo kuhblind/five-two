@@ -3,7 +3,15 @@
 const STORE_KEY = 'fivetwo.state';
 const STORE_VERSION = 7;
 
+/* attr/url-safe id shape for anything interpolated into templates */
+const SAFE_ID_RE = /^[a-zA-Z0-9_-]+$/;
+
 let storageWarned = false;
+
+function localDate(d) {
+  d = d || new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
 
 function loadState() {
   try {
@@ -57,23 +65,16 @@ function migrate(state) {
     });
     state.version = 3;
   }
-  // v3 -> v4: travel-mode library — merge any seed exercises the stored state
-  // doesn't know yet (never overwrites user-edited entries)
+  // v3 -> v4: travel-mode library release (seed merge now happens on every
+  // load in normalizeState; nothing version-specific left to do)
   if (state.version < 4) {
-    if (!state.exercises || typeof state.exercises !== 'object') state.exercises = {};
-    if (typeof SEED_EXERCISES !== 'undefined') {
-      SEED_EXERCISES.forEach((e) => { if (!state.exercises[e.id]) state.exercises[e.id] = e; });
-    }
     state.version = 4;
   }
   // v4 -> v5: back-safe exercise upgrade (52y / 1.99m / protected lumbar).
-  // Seed-merge new exercises; days still matching the old seed get the new
-  // seed wholesale; customized days only have deleted exercises replaced.
+  // Days still matching the old seed get the v5 seed wholesale (FROZEN
+  // snapshot — never the live seed, so this step stays reproducible);
+  // customized days only have deleted exercises replaced.
   if (state.version < 5) {
-    if (!state.exercises || typeof state.exercises !== 'object') state.exercises = {};
-    if (typeof SEED_EXERCISES !== 'undefined') {
-      SEED_EXERCISES.forEach((e) => { if (!state.exercises[e.id]) state.exercises[e.id] = e; });
-    }
     const DELETED = { db_front_squat: 'trap_bar_deadlift', russian_twist: 'dead_bug' };
     const OLD_BLOCKS = {
       early: {
@@ -93,6 +94,24 @@ function migrate(state) {
         MIXED2: ['devil_press', 'box_jump_over', 'sprawl', 'russian_twist', 'bear_crawl'],
       },
     };
+    const NEW_BLOCKS_V5 = {
+      early: {
+        LEGS1:  ['box_squat', 'reverse_lunge', 'hip_thrust', 'box_step_up', 'band_lateral_walk'],
+        UPPER1: ['pull_up', 'db_bench_press', 'overhead_press', 'chest_supported_row', 'ab_rollout'],
+        MIXED1: ['box_jump', 'kb_swing', 'thruster', 'plank_to_pike', 'farmers_carry'],
+        LEGS2:  ['trap_bar_deadlift', 'bulgarian_split_squat', 'goblet_squat', 'calf_raise', 'wall_sit'],
+        UPPER2: ['incline_db_press', 'lat_pulldown', 'dips', 'shoulder_matrix', 'face_pull'],
+        MIXED2: ['burpee', 'walking_lunge', 'renegade_row', 'med_ball_slam', 'mountain_climbers'],
+      },
+      late: {
+        LEGS1:  ['paused_box_squat', 'deficit_reverse_lunge', 'single_leg_hip_thrust', 'lateral_box_step', 'band_matrix'],
+        UPPER1: ['weighted_pull_up', 'bench_press', 'arnold_press', 'single_arm_row', 'hanging_knee_raise'],
+        MIXED1: ['broad_jump', 'kb_clean_press', 'db_snatch', 'mcgill_curl_up', 'suitcase_carry'],
+        LEGS2:  ['trap_bar_deadlift', 'lateral_lunge', 'single_leg_rdl', 'jump_squat', 'wall_sit'],
+        UPPER2: ['weighted_dip', 'chin_up', 'cable_chest_fly', 'lateral_raise', 'pallof_press'],
+        MIXED2: ['devil_press', 'box_jump_over', 'sprawl', 'dead_bug', 'bear_crawl'],
+      },
+    };
     (state.journeys || []).forEach((j) => {
       if (!j.blocks) return;
       ['early', 'late'].forEach((b) => {
@@ -100,7 +119,7 @@ function migrate(state) {
           const cur = j.blocks[b][day];
           if (!Array.isArray(cur)) return;
           const old = OLD_BLOCKS[b] && OLD_BLOCKS[b][day];
-          const neu = (typeof SEED_BLOCKS !== 'undefined') && SEED_BLOCKS[b] && SEED_BLOCKS[b][day];
+          const neu = NEW_BLOCKS_V5[b] && NEW_BLOCKS_V5[b][day];
           if (old && neu && JSON.stringify(cur) === JSON.stringify(old)) {
             j.blocks[b][day] = neu.slice();
           } else {
@@ -109,8 +128,10 @@ function migrate(state) {
         });
       });
     });
-    delete state.exercises.db_front_squat;
-    delete state.exercises.russian_twist;
+    if (state.exercises) {
+      delete state.exercises.db_front_squat;
+      delete state.exercises.russian_twist;
+    }
     state.version = 5;
   }
   // v5 -> v6: no medicine ball in the kit — drop the slam
@@ -128,20 +149,9 @@ function migrate(state) {
     if (state.exercises) delete state.exercises.med_ball_slam;
     state.version = 6;
   }
-  // v6 -> v7: descriptions/cues live in the seed, buckets belong to the user.
-  // Refresh all seed-owned fields on existing entries (fixes stale descs from
-  // earlier releases), merge missing ones, keep user-set buckets untouched.
+  // v6 -> v7: Big Three tracking (seed field refresh now happens on every
+  // load in normalizeState)
   if (state.version < 7) {
-    if (!state.exercises || typeof state.exercises !== 'object') state.exercises = {};
-    if (typeof SEED_EXERCISES !== 'undefined') {
-      SEED_EXERCISES.forEach((e) => {
-        const cur = state.exercises[e.id];
-        if (!cur) { state.exercises[e.id] = e; return; }
-        cur.name = e.name; cur.group = e.group; cur.measure = e.measure;
-        cur.pattern = e.pattern; cur.cue = e.cue; cur.desc = e.desc;
-        // cur.bucket stays as the user set it
-      });
-    }
     state.bigThree = {};
     state.version = 7;
   }
@@ -153,7 +163,7 @@ function migrate(state) {
 function normalizeState(state) {
   if (!state || typeof state !== 'object') return null;
 
-  const defaults = { cardioMinutes: 2, fontScale: 1, weightStep: 2.5 };
+  const defaults = { cardioMinutes: 2, fontScale: 1, weightStep: 2.5, travelMode: false };
   state.settings = Object.assign({}, defaults, (state.settings && typeof state.settings === 'object') ? state.settings : {});
   if (![2, 3].includes(state.settings.cardioMinutes)) state.settings.cardioMinutes = 2;
   if (!(state.settings.fontScale >= 0.8 && state.settings.fontScale <= 1.6)) state.settings.fontScale = 1;
@@ -165,6 +175,26 @@ function normalizeState(state) {
   if (!Array.isArray(state.sessions)) state.sessions = [];
   if (!state.zone2Checks || typeof state.zone2Checks !== 'object') state.zone2Checks = {};
   if (!state.bigThree || typeof state.bigThree !== 'object') state.bigThree = {};
+
+  // ids get interpolated into HTML attributes — drop anything unsafe
+  // (only reachable via imported or hand-edited state)
+  Object.keys(state.exercises).forEach((k) => {
+    if (!SAFE_ID_RE.test(k)) delete state.exercises[k];
+  });
+
+  // seed sync on every load: merge missing seed exercises and refresh
+  // seed-owned fields (name/cue/desc/pattern/measure/group); bucket is
+  // user-owned and never touched. Runs outside migrations so seed-only
+  // releases reach existing installs without a version bump.
+  if (typeof SEED_EXERCISES !== 'undefined') {
+    SEED_EXERCISES.forEach((e) => {
+      const cur = state.exercises[e.id];
+      if (!cur) { state.exercises[e.id] = Object.assign({}, e); return; }
+      cur.name = e.name; cur.group = e.group; cur.measure = e.measure;
+      cur.pattern = e.pattern; cur.cue = e.cue; cur.desc = e.desc;
+      cur.travel = e.travel || false;
+    });
+  }
 
   state.journeys = state.journeys.filter((j) => j && j.id && j.blocks && Array.isArray(j.weekPlan) && j.weekPlan.length === 7);
   state.journeys.forEach((j) => {
@@ -184,14 +214,24 @@ function normalizeState(state) {
     state.activeJourneyId = state.journeys.length ? state.journeys[0].id : null;
   }
 
-  state.sessions = state.sessions.filter((s) => s && s.id && s.dayType);
+  state.sessions = state.sessions.filter((s) => s && s.id && SAFE_ID_RE.test(String(s.id)) && s.dayType);
 
-  // a stored in-progress session must reference a live journey and have sane shape
+  // bigThree keys: only the last 7 days are ever read — prune beyond 30
+  const cutoff = Date.now() - 30 * 86400000;
+  Object.keys(state.bigThree).forEach((k) => {
+    const t = new Date(k + 'T12:00:00').getTime();
+    if (!(t > cutoff)) delete state.bigThree[k];
+  });
+
+  // a stored in-progress session must reference a live journey and have sane
+  // shape; past the readiness phase it must carry its frozen slot list, or a
+  // resumed session would silently log empty rounds
   const c = state.current;
   if (c) {
     const okShape = c.journeyId && state.journeys.find((j) => j.id === c.journeyId)
       && c.round >= 1 && c.round <= 5 && ['readiness', 'lift', 'cardio', 'effort'].includes(c.phase)
-      && Array.isArray(c.sets) && Array.isArray(c.cardio);
+      && Array.isArray(c.sets) && Array.isArray(c.cardio)
+      && (c.phase === 'readiness' || (Array.isArray(c.slots) && c.slots.length > 0));
     if (!okShape) state.current = null;
   }
 
@@ -202,9 +242,8 @@ function exportJSON(state) {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const d = new Date().toISOString().slice(0, 10);
   a.href = url;
-  a.download = `five-two-backup-${d}.json`;
+  a.download = `five-two-backup-${localDate()}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();

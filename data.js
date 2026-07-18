@@ -7,8 +7,6 @@ const CARDIO_MODALITIES = [
   'Heavy bag', 'Battle ropes', 'Skipping', 'Plyo circuit',
 ];
 
-const ZONE2_MODALITIES = ['Bike', 'Run', 'Row', 'Walk / Hike', 'Stepper', 'Swim'];
-
 const DAY_TYPES = {
   LEGS1:  { label: 'Legs 1',  kind: 'legs' },
   UPPER1: { label: 'Upper 1', kind: 'upper' },
@@ -260,13 +258,13 @@ const SEED_EXERCISES = [
     cue: 'One-sided carry, stay level, per side',
     desc: "Farmer's carry with only one dumbbell — the core fights to keep you level. Swap sides halfway. Logged in seconds per side." },
   // travel: band + bodyweight library (1 long band with door anchor + 1 loop band)
-  { id: 'band_squat', name: 'Band squat', group: 'legs', measure: 'reps', bucket: '13-16', pattern: 'squat',
+  { id: 'band_squat', name: 'Band squat', group: 'legs', measure: 'reps', bucket: '13-16', pattern: 'squat', travel: true,
     cue: 'Stand on the band, handles at shoulders',
     desc: 'Stand on the long band with both feet, handles racked at the shoulders. Squat to depth and drive up against the band. Log band level instead of kg.' },
   { id: 'split_squat', name: 'Split squat', group: 'legs', measure: 'reps', bucket: '9-12', pattern: 'lunge',
     cue: 'Static lunge stance, per leg',
     desc: 'Static lunge: one foot forward, one back, drop the rear knee to the floor and drive up. Rear foot on a chair for the Bulgarian version. Per leg.' },
-  { id: 'band_rdl', name: 'Band RDL', group: 'legs', measure: 'reps', bucket: '13-16', pattern: 'hinge',
+  { id: 'band_rdl', name: 'Band RDL', group: 'legs', measure: 'reps', bucket: '13-16', pattern: 'hinge', travel: true,
     cue: 'Stand on band, hinge against it',
     desc: 'Stand on the long band, handles at the thighs. Push the hips back with a flat back, then stand tall against the band tension, squeezing the glutes.' },
   { id: 'glute_bridge', name: 'Glute bridge', group: 'legs', measure: 'reps', bucket: '13-16', pattern: 'bridge',
@@ -275,28 +273,28 @@ const SEED_EXERCISES = [
   { id: 'single_leg_glute_bridge', name: 'Single-leg glute bridge', group: 'legs', measure: 'reps', bucket: '9-12', pattern: 'bridge',
     cue: 'One foot down, per leg',
     desc: 'Glute bridge with one leg extended — all the load through one side. Hips stay level. Per leg.' },
-  { id: 'band_row', name: 'Band row', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'pull',
+  { id: 'band_row', name: 'Band row', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'pull', travel: true,
     cue: 'Anchor at chest height, squeeze blades',
     desc: 'Long band anchored in the door at chest height (or around your feet, seated). Row the handles to the lower ribs, squeezing the shoulder blades together.' },
-  { id: 'band_pulldown', name: 'Band pulldown', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'pull',
+  { id: 'band_pulldown', name: 'Band pulldown', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'pull', travel: true,
     cue: 'Anchor high, pull to chest',
     desc: 'Long band anchored at the top of the door. Kneel or sit, pull the handles down to the upper chest with the chest proud — the hotel-room pull-up.' },
-  { id: 'band_pull_apart', name: 'Band pull-apart', group: 'upper', measure: 'reps', bucket: '17-20+', pattern: 'pull',
+  { id: 'band_pull_apart', name: 'Band pull-apart', group: 'upper', measure: 'reps', bucket: '17-20+', pattern: 'pull', travel: true,
     cue: 'Arms straight, band to chest',
     desc: 'Hold the band at shoulder height with straight arms and pull it apart until it touches the chest. Rear shoulders and posture — the face-pull stand-in.' },
-  { id: 'band_chest_press', name: 'Band chest press', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'push',
+  { id: 'band_chest_press', name: 'Band chest press', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'push', travel: true,
     cue: 'Band around the back, press forward',
     desc: 'Long band around the upper back, a handle in each hand. Press forward to full extension, control the return. Split stance for stability.' },
-  { id: 'chair_dip', name: 'Chair dip', group: 'upper', measure: 'reps', bucket: '9-12', pattern: 'push',
+  { id: 'chair_dip', name: 'Chair dip', group: 'upper', measure: 'reps', bucket: '9-12', pattern: 'push', travel: true,
     cue: 'Hands on chair edge, elbows to 90°',
     desc: 'Hands on the edge of a sturdy chair, legs extended in front. Lower until the elbows reach 90°, press back up. Bend the knees to make it easier.' },
-  { id: 'band_overhead_press', name: 'Band overhead press', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'press',
+  { id: 'band_overhead_press', name: 'Band overhead press', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'press', travel: true,
     cue: 'Stand on band, press strict',
     desc: 'Stand on the long band, handles at the shoulders. Press strictly overhead against the band, ribs down, no lean-back.' },
-  { id: 'band_lateral_raise', name: 'Band lateral raise', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'raise',
+  { id: 'band_lateral_raise', name: 'Band lateral raise', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'raise', travel: true,
     cue: 'Stand on band, raise to shoulder height',
     desc: 'Stand on the band, arms at the sides. Raise the handles out to shoulder height with soft elbows, lower slowly.' },
-  { id: 'band_thruster', name: 'Band thruster', group: 'mixed', measure: 'reps', bucket: '13-16', pattern: 'press',
+  { id: 'band_thruster', name: 'Band thruster', group: 'mixed', measure: 'reps', bucket: '13-16', pattern: 'press', travel: true,
     cue: 'Squat into overhead press, one motion',
     desc: 'Stand on the long band, handles at the shoulders. Squat to depth, then drive up and press overhead in one continuous motion — the hotel thruster.' },
   { id: 'walkout', name: 'Walkout', group: 'core', measure: 'reps', bucket: '9-12', pattern: 'core',
@@ -362,7 +360,7 @@ const WEEK_PLAN = ['LEGS1', 'UPPER1', 'MIXED1', 'LEGS2', 'UPPER2', 'SPRINT', 'RE
 
 function seedState() {
   const exercises = {};
-  SEED_EXERCISES.forEach((e) => { exercises[e.id] = e; });
+  SEED_EXERCISES.forEach((e) => { exercises[e.id] = Object.assign({}, e); });
   return {
     version: STORE_VERSION,
     settings: { cardioMinutes: 2, fontScale: 1, weightStep: 2.5, travelMode: false },
@@ -370,7 +368,7 @@ function seedState() {
     journeys: [{
       id: 'j1',
       name: 'Journey 1',
-      startDate: new Date().toISOString().slice(0, 10),
+      startDate: localDate(),
       weekCount: 6,
       weekPlan: WEEK_PLAN.slice(),
       blocks: JSON.parse(JSON.stringify(SEED_BLOCKS)),
