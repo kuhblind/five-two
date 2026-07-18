@@ -1,7 +1,7 @@
 /* storage.js — versioned localStorage persistence + normalization + export/import */
 
 const STORE_KEY = 'fivetwo.state';
-const STORE_VERSION = 3;
+const STORE_VERSION = 4;
 
 let storageWarned = false;
 
@@ -57,6 +57,15 @@ function migrate(state) {
     });
     state.version = 3;
   }
+  // v3 -> v4: travel-mode library — merge any seed exercises the stored state
+  // doesn't know yet (never overwrites user-edited entries)
+  if (state.version < 4) {
+    if (!state.exercises || typeof state.exercises !== 'object') state.exercises = {};
+    if (typeof SEED_EXERCISES !== 'undefined') {
+      SEED_EXERCISES.forEach((e) => { if (!state.exercises[e.id]) state.exercises[e.id] = e; });
+    }
+    state.version = 4;
+  }
   return state;
 }
 
@@ -70,6 +79,7 @@ function normalizeState(state) {
   if (![2, 3].includes(state.settings.cardioMinutes)) state.settings.cardioMinutes = 2;
   if (!(state.settings.fontScale >= 0.8 && state.settings.fontScale <= 1.6)) state.settings.fontScale = 1;
   if (![1.25, 2.5, 5].includes(state.settings.weightStep)) state.settings.weightStep = 2.5;
+  state.settings.travelMode = !!state.settings.travelMode;
 
   if (!state.exercises || typeof state.exercises !== 'object') state.exercises = {};
   if (!Array.isArray(state.journeys)) state.journeys = [];

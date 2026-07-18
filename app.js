@@ -60,6 +60,17 @@ function ex(id) {
 
 function dayType(j, dayIndex) { return j.weekPlan[dayIndex] || 'REST'; }
 
+function travelEx(id) {
+  return (S.settings.travelMode && TRAVEL_SUBS[id] && S.exercises[TRAVEL_SUBS[id]]) ? TRAVEL_SUBS[id] : id;
+}
+
+function cardioList() { return S.settings.travelMode ? TRAVEL_CARDIO : CARDIO_MODALITIES; }
+
+function toggleTravelMode() {
+  S.settings.travelMode = !S.settings.travelMode;
+  save(); render();
+}
+
 function is52Day(type) { return !['ZONE2', 'REST', 'SPRINT'].includes(type); }
 
 function slotsFor(j, week, type) {
@@ -214,6 +225,10 @@ function pickReadiness(mode) {
   let slots = slotsFor(j, c.week, c.dayType).slice(0, 5);
   if (mode === 'tired') slots = slots.slice().reverse();
   if (mode === 'sore') slots = sorenessSwap(slots);
+  if (S.settings.travelMode) {
+    slots = slots.map(travelEx);
+    c.travel = true;
+  }
   c.slots = slots;
   c.readiness = mode;
   c.phase = 'lift';
@@ -379,7 +394,7 @@ function finishSession() {
     id: 's' + Date.now() + '-' + S.sessions.length,
     ts: Date.now(),
     journeyId: c.journeyId, week: c.week, dayIndex: c.dayIndex, dayType: c.dayType,
-    readiness: c.readiness, effort: c.effort,
+    readiness: c.readiness, effort: c.effort, travel: c.travel || false,
     sets: c.sets, cardio: c.cardio,
   });
   S.current = null;
@@ -510,6 +525,21 @@ function dayBadge(type) {
 
 function dayLabel(type) { return (DAY_TYPES[type] || { label: type }).label; }
 
+function travelCardHTML() {
+  const on = S.settings.travelMode;
+  return `<div class="card ${on ? 'highlight' : ''}">
+    <div class="row spread">
+      <div>
+        <h3>Travel mode ${on ? '· ON' : ''}</h3>
+        <p class="muted small">${on
+          ? 'Sessions swap to band & bodyweight versions. Second stepper logs band level, not kg.'
+          : 'No gym? Same program, band & bodyweight versions. Kit: 1 long band (door anchor) + 1 loop band.'}</p>
+      </div>
+      <button class="btn-small ${on ? '' : 'btn-ghost'}" onclick="toggleTravelMode()" aria-label="toggle travel mode">${on ? 'On' : 'Off'}</button>
+    </div>
+  </div>`;
+}
+
 function zone2CardHTML(week) {
   const j = journey();
   const key = j.id + ':' + week;
@@ -549,7 +579,7 @@ function vHome() {
     const detail = type === 'REST' ? '<p class="muted">Rest & recover — adaptation happens today.</p>'
       : type === 'SPRINT' ? '<p class="muted">Sprint intervals — run, bike, row or SkiErg.</p>'
       : type === 'ZONE2' ? '<p class="muted">Zone 2 — ~60 min easy pace</p>'
-      : `<p class="muted small">${slots.map((id, i) => `${'ABCDE'[i]} ${esc(ex(id).name)}`).join(' · ')}</p>`;
+      : `<p class="muted small">${slots.map((id, i) => `${'ABCDE'[i]} ${esc(ex(travelEx(id)).name)}`).join(' · ')}</p>`;
     html += `<div class="card highlight">
       <div class="row spread"><h3>Next up</h3>${dayBadge(type)}</div>
       <p class="big">Week ${next.week} · Day ${next.dayIndex + 1}</p>
@@ -557,6 +587,7 @@ function vHome() {
       <button class="btn-primary mt" onclick="startSession(${next.week}, ${next.dayIndex})">Start</button>
     </div>`;
     html += zone2CardHTML(next.week);
+    html += travelCardHTML();
   } else {
     html += `<div class="card highlight"><h3>Journey complete</h3>
       <p class="muted">All ${j.weekCount} weeks done. Start a new journey in Settings.</p></div>`;
@@ -639,10 +670,12 @@ function vWorkout() {
           </div>
         </div>
         ${en.info ? `<p class="muted small how-to">${esc(e.desc || e.cue || 'No description yet.')}</p>` : ''}
-        ${en.fresh && en.weight === 0 && isReps ? `<p class="muted small fresh-hint">First time: think of your max weight, then go ~25% lighter.</p>` : ''}
+        ${en.fresh && en.weight === 0 && isReps && !S.settings.travelMode ? `<p class="muted small fresh-hint">First time: think of your max weight, then go ~25% lighter.</p>` : ''}
         <div class="set-row">
           ${stepperHTML(i, 'amount', en.amount, isReps ? 'reps' : 'secs', isReps ? -1 : -5, isReps ? 1 : 5)}
-          ${stepperHTML(i, 'weight', en.weight, 'kg', -S.settings.weightStep, S.settings.weightStep)}
+          ${S.settings.travelMode
+            ? stepperHTML(i, 'weight', en.weight, 'band', -1, 1)
+            : stepperHTML(i, 'weight', en.weight, 'kg', -S.settings.weightStep, S.settings.weightStep)}
         </div>
       </div>`;
     }).join('');
@@ -676,7 +709,7 @@ function vWorkout() {
   const paused = timer && timer.paused;
   return `<div class="topbar"><span class="title">${title}</span><span class="muted">Cardio ${c.round}/5</span></div>
     <div class="progress-dots">${dots}</div>
-    <div class="modality-grid">${CARDIO_MODALITIES.map((m) =>
+    <div class="modality-grid">${cardioList().map((m) =>
       `<button class="${c.lastModality === m ? 'sel' : ''}" onclick="pickModality('${m}')">${m}</button>`).join('')}</div>
     <div class="timer-wrap">
       ${noTimer
@@ -724,7 +757,8 @@ function vZone2() {
 
 function vSprint() {
   const w = view.week, d = view.dayIndex;
-  if (!view.spMod) view.spMod = S.lastSprintMod || 'Run / Track';
+  const mods = S.settings.travelMode ? TRAVEL_SPRINT_MODALITIES : SPRINT_MODALITIES;
+  if (!view.spMod || !mods.includes(view.spMod)) view.spMod = mods.includes(S.lastSprintMod) ? S.lastSprintMod : mods[0];
   if (!view.spInt) view.spInt = 8;
   if (!view.spMin) view.spMin = 20;
   return `<div class="topbar"><button onclick="go('home')" aria-label="back">←</button><span class="title">Sprint · Week ${w}</span></div>
@@ -732,7 +766,7 @@ function vSprint() {
       <button class="btn-small btn-ghost" onclick="go('activation')">Ideas →</button></div>
     <div class="card">
       <h3>Modality</h3>
-      <div class="modality-grid">${SPRINT_MODALITIES.map((m) =>
+      <div class="modality-grid">${mods.map((m) =>
         `<button class="${view.spMod === m ? 'sel' : ''}" onclick="view.spMod='${m}';render()">${m}</button>`).join('')}</div>
       <h3 class="mt">Sprints</h3>
       <div class="row" style="justify-content:center">
@@ -793,7 +827,7 @@ function vSummary() {
   return `<h1>Session done</h1>
     <div class="card">
       <div class="row spread"><h3>W${s.week} · ${dayLabel(s.dayType)}</h3>${dayBadge(s.dayType)}</div>
-      ${s.effort ? `<p class="muted small">Felt: <b>${esc(s.effort)}</b>${s.readiness ? ' · started: ' + esc(s.readiness) : ''}</p>` : ''}
+      ${s.effort ? `<p class="muted small">Felt: <b>${esc(s.effort)}</b>${s.readiness ? ' · started: ' + esc(s.readiness) : ''}${s.travel ? ' · travel' : ''}</p>` : ''}
       ${sessionDetailHTML(s)}
     </div>
     <div class="banner">Deactivate: 10–15 min stretch + breathing, then refuel within 20–30 min (protein + fluids).
@@ -819,7 +853,7 @@ function sessionDetailHTML(s) {
   });
   const lifts = Object.keys(byEx).map((exId) => {
     const e = ex(exId);
-    const sets = byEx[exId].map((x) => `${x.amount}${e.measure === 'secs' ? 's' : ''}${x.weight ? '×' + x.weight + 'kg' : ''}`).join(', ');
+    const sets = byEx[exId].map((x) => `${x.amount}${e.measure === 'secs' ? 's' : ''}${x.weight ? '×' + x.weight + (s.travel ? ' band' : 'kg') : ''}`).join(', ');
     return `<div class="set-row"><span>${esc(e.name)}</span><span class="muted small">${sets}</span></div>`;
   }).join('');
   const cardio = (s.cardio || []).map((cd) =>
@@ -830,7 +864,7 @@ function sessionDetailHTML(s) {
 function vJournal() {
   const items = S.sessions.slice().reverse().map((s) =>
     `<div class="session-item" onclick="go('session', {sessionId: '${s.id}'})">
-      <div><b>W${s.week} · ${dayLabel(s.dayType)}</b><br><span class="muted small">${fmtDate(s.ts)}${s.effort ? ' · ' + esc(s.effort) : ''}</span></div>
+      <div><b>W${s.week} · ${dayLabel(s.dayType)}</b><br><span class="muted small">${fmtDate(s.ts)}${s.effort ? ' · ' + esc(s.effort) : ''}${s.travel ? ' · travel' : ''}</span></div>
       ${dayBadge(s.dayType)}
     </div>`).join('');
   return `<h1>Journal</h1><div class="card">${items || '<p class="muted">No sessions yet. Your logged workouts will appear here.</p>'}</div>`;
@@ -842,7 +876,7 @@ function vSession() {
   return `<div class="topbar"><button onclick="go('journal')" aria-label="back">←</button><span class="title">${fmtDate(s.ts)}</span></div>
     <div class="card">
       <div class="row spread"><h3>W${s.week} · ${dayLabel(s.dayType)}</h3>${dayBadge(s.dayType)}</div>
-      ${s.effort ? `<p class="muted small">Felt: <b>${esc(s.effort)}</b>${s.readiness ? ' · started: ' + esc(s.readiness) : ''}</p>` : ''}
+      ${s.effort ? `<p class="muted small">Felt: <b>${esc(s.effort)}</b>${s.readiness ? ' · started: ' + esc(s.readiness) : ''}${s.travel ? ' · travel' : ''}</p>` : ''}
       ${sessionDetailHTML(s)}
     </div>
     <button class="btn-danger btn-big" onclick="deleteSession('${s.id}')">Delete session</button>`;

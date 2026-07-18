@@ -231,7 +231,82 @@ const SEED_EXERCISES = [
   { id: 'suitcase_carry', name: 'Suitcase carry', group: 'mixed', measure: 'secs', bucket: null, pattern: 'carry',
     cue: 'One-sided carry, stay level, per side',
     desc: "Farmer's carry with only one dumbbell — the core fights to keep you level. Swap sides halfway. Logged in seconds per side." },
+  // travel: band + bodyweight library (1 long band with door anchor + 1 loop band)
+  { id: 'band_squat', name: 'Band squat', group: 'legs', measure: 'reps', bucket: '13-16', pattern: 'squat',
+    cue: 'Stand on the band, handles at shoulders',
+    desc: 'Stand on the long band with both feet, handles racked at the shoulders. Squat to depth and drive up against the band. Log band level instead of kg.' },
+  { id: 'split_squat', name: 'Split squat', group: 'legs', measure: 'reps', bucket: '9-12', pattern: 'lunge',
+    cue: 'Static lunge stance, per leg',
+    desc: 'Static lunge: one foot forward, one back, drop the rear knee to the floor and drive up. Rear foot on a chair for the Bulgarian version. Per leg.' },
+  { id: 'band_rdl', name: 'Band RDL', group: 'legs', measure: 'reps', bucket: '13-16', pattern: 'hinge',
+    cue: 'Stand on band, hinge against it',
+    desc: 'Stand on the long band, handles at the thighs. Push the hips back with a flat back, then stand tall against the band tension, squeezing the glutes.' },
+  { id: 'glute_bridge', name: 'Glute bridge', group: 'legs', measure: 'reps', bucket: '13-16', pattern: 'bridge',
+    cue: 'Shoulders on floor, squeeze at top',
+    desc: 'Lying on the floor, feet planted, drive the hips up until the body is one line from knees to shoulders. Pause and squeeze at the top. Loop band above the knees for extra work.' },
+  { id: 'single_leg_glute_bridge', name: 'Single-leg glute bridge', group: 'legs', measure: 'reps', bucket: '9-12', pattern: 'bridge',
+    cue: 'One foot down, per leg',
+    desc: 'Glute bridge with one leg extended — all the load through one side. Hips stay level. Per leg.' },
+  { id: 'band_row', name: 'Band row', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'pull',
+    cue: 'Anchor at chest height, squeeze blades',
+    desc: 'Long band anchored in the door at chest height (or around your feet, seated). Row the handles to the lower ribs, squeezing the shoulder blades together.' },
+  { id: 'band_pulldown', name: 'Band pulldown', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'pull',
+    cue: 'Anchor high, pull to chest',
+    desc: 'Long band anchored at the top of the door. Kneel or sit, pull the handles down to the upper chest with the chest proud — the hotel-room pull-up.' },
+  { id: 'band_pull_apart', name: 'Band pull-apart', group: 'upper', measure: 'reps', bucket: '17-20+', pattern: 'pull',
+    cue: 'Arms straight, band to chest',
+    desc: 'Hold the band at shoulder height with straight arms and pull it apart until it touches the chest. Rear shoulders and posture — the face-pull stand-in.' },
+  { id: 'band_chest_press', name: 'Band chest press', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'push',
+    cue: 'Band around the back, press forward',
+    desc: 'Long band around the upper back, a handle in each hand. Press forward to full extension, control the return. Split stance for stability.' },
+  { id: 'chair_dip', name: 'Chair dip', group: 'upper', measure: 'reps', bucket: '9-12', pattern: 'push',
+    cue: 'Hands on chair edge, elbows to 90°',
+    desc: 'Hands on the edge of a sturdy chair, legs extended in front. Lower until the elbows reach 90°, press back up. Bend the knees to make it easier.' },
+  { id: 'band_overhead_press', name: 'Band overhead press', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'press',
+    cue: 'Stand on band, press strict',
+    desc: 'Stand on the long band, handles at the shoulders. Press strictly overhead against the band, ribs down, no lean-back.' },
+  { id: 'band_lateral_raise', name: 'Band lateral raise', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'raise',
+    cue: 'Stand on band, raise to shoulder height',
+    desc: 'Stand on the band, arms at the sides. Raise the handles out to shoulder height with soft elbows, lower slowly.' },
+  { id: 'band_thruster', name: 'Band thruster', group: 'mixed', measure: 'reps', bucket: '13-16', pattern: 'press',
+    cue: 'Squat into overhead press, one motion',
+    desc: 'Stand on the long band, handles at the shoulders. Squat to depth, then drive up and press overhead in one continuous motion — the hotel thruster.' },
+  { id: 'walkout', name: 'Walkout', group: 'core', measure: 'reps', bucket: '9-12', pattern: 'core',
+    cue: 'Hands walk out to plank, no sag',
+    desc: 'From standing, fold forward, walk the hands out to a long plank without letting the hips sag, then walk back and stand. The rollout without the wheel.' },
+  { id: 'plank_hold', name: 'Plank hold', group: 'core', measure: 'secs', bucket: null, pattern: 'hold',
+    cue: 'One straight line, braced',
+    desc: 'Forearm plank: body one straight line from heels to head, glutes and abs braced. Logged in seconds.' },
+  { id: 'side_plank', name: 'Side plank', group: 'core', measure: 'secs', bucket: null, pattern: 'hold',
+    cue: 'Hips high, per side',
+    desc: 'On one forearm, body in a straight line, hips high. The anti-lean core work — the suitcase carry without the suitcase. Logged in seconds per side.' },
 ];
+
+/* Travel mode: gym exercise -> band/bodyweight substitute (same movement pattern).
+   Exercises not listed are already hotel-compatible and stay as they are. */
+const TRAVEL_SUBS = {
+  box_squat: 'band_squat', paused_box_squat: 'band_squat', goblet_squat: 'band_squat', db_front_squat: 'band_squat',
+  deficit_reverse_lunge: 'reverse_lunge', bulgarian_split_squat: 'split_squat',
+  box_step_up: 'walking_lunge', lateral_box_step: 'lateral_lunge',
+  romanian_deadlift: 'band_rdl',
+  hip_thrust: 'glute_bridge', single_leg_hip_thrust: 'single_leg_glute_bridge',
+  pull_up: 'band_pulldown', weighted_pull_up: 'band_pulldown', chin_up: 'band_pulldown', lat_pulldown: 'band_pulldown',
+  bent_over_row: 'band_row', single_arm_row: 'band_row', renegade_row: 'band_row',
+  face_pull: 'band_pull_apart',
+  db_bench_press: 'push_up', bench_press: 'push_up', incline_db_press: 'push_up',
+  cable_chest_fly: 'band_chest_press',
+  dips: 'chair_dip', weighted_dip: 'chair_dip',
+  overhead_press: 'band_overhead_press', arnold_press: 'band_overhead_press',
+  shoulder_matrix: 'band_lateral_raise', lateral_raise: 'band_lateral_raise',
+  ab_rollout: 'walkout', hanging_knee_raise: 'v_up',
+  box_jump: 'jump_squat', broad_jump: 'jump_squat', box_jump_over: 'sprawl',
+  kb_swing: 'jump_squat', kb_clean_press: 'band_thruster', thruster: 'band_thruster', db_snatch: 'band_thruster',
+  devil_press: 'burpee', med_ball_slam: 'sprawl',
+  farmers_carry: 'plank_hold', suitcase_carry: 'side_plank',
+};
+
+const TRAVEL_CARDIO = ['Skipping', 'Shadow boxing', 'Burpees', 'High knees', 'Stair runs'];
+const TRAVEL_SPRINT_MODALITIES = ['Stair runs', 'Burpees', 'Shadow boxing', 'High knees'];
 
 // Slot order = accumulator frequency: A done 5x per session, B 4x ... E 1x.
 // A/B = anchor lifts. Weeks 1-3 (early) and 4-6 (late) blocks.
@@ -261,7 +336,7 @@ function seedState() {
   SEED_EXERCISES.forEach((e) => { exercises[e.id] = e; });
   return {
     version: STORE_VERSION,
-    settings: { cardioMinutes: 2, fontScale: 1, weightStep: 2.5 },
+    settings: { cardioMinutes: 2, fontScale: 1, weightStep: 2.5, travelMode: false },
     exercises,
     journeys: [{
       id: 'j1',
