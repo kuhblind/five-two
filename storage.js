@@ -1,28 +1,85 @@
-/* storage.js — versioned localStorage persistence + export/import */
+/* storage.js — versioned localStorage persistence + normalization + export/import */
 
 const STORE_KEY = 'fivetwo.state';
 const STORE_VERSION = 1;
+
+let storageWarned = false;
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
     if (!raw) return null;
-    const state = JSON.parse(raw);
-    return migrate(state);
+    return normalizeState(migrate(JSON.parse(raw)));
   } catch (e) {
     console.error('loadState failed', e);
+    // keep the corrupt blob around for manual rescue instead of silently losing it
+    try { localStorage.setItem(STORE_KEY + '.corrupt', localStorage.getItem(STORE_KEY) || ''); } catch (e2) { /* full */ }
     return null;
   }
 }
 
 function saveState(state) {
   state.version = STORE_VERSION;
-  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.error('saveState failed', e);
+    if (!storageWarned) {
+      storageWarned = true;
+      alert('Could not save — device storage may be full. Export a backup from Settings as soon as possible.');
+    }
+  }
 }
 
 function migrate(state) {
   // future migrations bump STORE_VERSION and transform here
   if (!state.version) state.version = 1;
+  return state;
+}
+
+/* Make any loaded/imported state safe to run against: fill missing fields,
+   drop dangling references, clamp bad values. Never throws. */
+function normalizeState(state) {
+  if (!state || typeof state !== 'object') return null;
+
+  const defaults = { cardioMinutes: 2, fontScale: 1, weightStep: 2.5 };
+  state.settings = Object.assign({}, defaults, (state.settings && typeof state.settings === 'object') ? state.settings : {});
+  if (![2, 3].includes(state.settings.cardioMinutes)) state.settings.cardioMinutes = 2;
+  if (!(state.settings.fontScale >= 0.8 && state.settings.fontScale <= 1.6)) state.settings.fontScale = 1;
+  if (![1.25, 2.5, 5].includes(state.settings.weightStep)) state.settings.weightStep = 2.5;
+
+  if (!state.exercises || typeof state.exercises !== 'object') state.exercises = {};
+  if (!Array.isArray(state.journeys)) state.journeys = [];
+  if (!Array.isArray(state.sessions)) state.sessions = [];
+
+  state.journeys = state.journeys.filter((j) => j && j.id && j.blocks && Array.isArray(j.weekPlan) && j.weekPlan.length === 7);
+  state.journeys.forEach((j) => {
+    if (!(j.weekCount >= 1 && j.weekCount <= 12)) j.weekCount = 6;
+    ['early', 'late'].forEach((b) => {
+      if (!j.blocks[b] || typeof j.blocks[b] !== 'object') j.blocks[b] = {};
+      j.weekPlan.forEach((t) => {
+        if (t === 'ZONE2') return;
+        if (!Array.isArray(j.blocks[b][t])) j.blocks[b][t] = [];
+        j.blocks[b][t] = j.blocks[b][t].slice(0, 5);
+      });
+    });
+  });
+
+  if (!state.journeys.find((j) => j.id === state.activeJourneyId)) {
+    state.activeJourneyId = state.journeys.length ? state.journeys[0].id : null;
+  }
+
+  state.sessions = state.sessions.filter((s) => s && s.id && s.dayType);
+
+  // a stored in-progress session must reference a live journey and have sane shape
+  const c = state.current;
+  if (c) {
+    const okShape = c.journeyId && state.journeys.find((j) => j.id === c.journeyId)
+      && c.round >= 1 && c.round <= 5 && ['lift', 'cardio'].includes(c.phase)
+      && Array.isArray(c.sets) && Array.isArray(c.cardio);
+    if (!okShape) state.current = null;
+  }
+
   return state;
 }
 
@@ -40,11 +97,20 @@ function exportJSON(state) {
 }
 
 function importJSON(file, onDone) {
+  if (!file) { onDone(new Error('no file selected'), null); return; }
   const reader = new FileReader();
+  reader.onerror = () => onDone(new Error('could not read file'), null);
   reader.onload = () => {
     try {
-      const state = migrate(JSON.parse(reader.result));
-      if (!state.exercises || !state.journeys) throw new Error('not a five-two backup');
+      const parsed = JSON.parse(reader.result);
+      if (!parsed || typeof parsed !== 'object' || !parsed.exercises || !parsed.journeys) {
+        throw new Error('not a five-two backup file');
+      }
+      if (parsed.version > STORE_VERSION) {
+        throw new Error('backup was made by a newer app version');
+      }
+      const state = normalizeState(migrate(parsed));
+      if (!state || !state.journeys.length) throw new Error('backup contains no usable journey');
       saveState(state);
       onDone(null, state);
     } catch (e) {
