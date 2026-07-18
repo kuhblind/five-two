@@ -254,7 +254,7 @@ const SEED_BLOCKS = {
   },
 };
 
-const WEEK_PLAN = ['LEGS1', 'UPPER1', 'SPRINT', 'LEGS2', 'UPPER2', 'MIXED1', 'REST'];
+const WEEK_PLAN = ['LEGS1', 'UPPER1', 'MIXED1', 'LEGS2', 'UPPER2', 'SPRINT', 'REST'];
 
 function seedState() {
   const exercises = {};

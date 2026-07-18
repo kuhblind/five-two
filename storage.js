@@ -1,7 +1,7 @@
 /* storage.js — versioned localStorage persistence + normalization + export/import */
 
 const STORE_KEY = 'fivetwo.state';
-const STORE_VERSION = 2;
+const STORE_VERSION = 3;
 
 let storageWarned = false;
 
@@ -43,6 +43,19 @@ function migrate(state) {
     // an in-progress v1 session doesn't map onto the new phase machine — drop it
     state.current = null;
     state.version = 2;
+  }
+  // v2 -> v3: Mixed and Sprint swap default positions (Mixed mid-week, Sprint day 6)
+  if (state.version < 3) {
+    (state.journeys || []).forEach((j) => {
+      if (!Array.isArray(j.weekPlan)) return;
+      const si = j.weekPlan.indexOf('SPRINT');
+      const mi = j.weekPlan.indexOf('MIXED1');
+      if (si >= 0 && mi >= 0) {
+        j.weekPlan[si] = 'MIXED1';
+        j.weekPlan[mi] = 'SPRINT';
+      }
+    });
+    state.version = 3;
   }
   return state;
 }
