@@ -247,7 +247,10 @@ function startSession(week, dayIndex) {
   const type = dayType(j, dayIndex);
 
   if (S.current) {
-    if (S.current.week === week && S.current.dayIndex === dayIndex) { go('workout'); return; }
+    if (S.current.week === week && S.current.dayIndex === dayIndex) {
+      if (S.current.phase === 'sprint') { go('sprint', { week, dayIndex }); return; }
+      go('workout'); return;
+    }
     if (!confirm('A session is already in progress. Discard it and start this one?')) return;
     S.current = null;
     stopTimer();
@@ -256,7 +259,21 @@ function startSession(week, dayIndex) {
     if (!confirm('This day is already logged. Log it again?')) return;
   }
   if (type === 'REST') { go('rest', { week, dayIndex }); return; }
-  if (type === 'SPRINT') { go('sprint', { week, dayIndex }); return; }
+  if (type === 'SPRINT') {
+    const last = S.lastSprint || {};
+    S.current = {
+      journeyId: j.id, week, dayIndex, dayType: 'SPRINT', phase: 'sprint',
+      sprints: [],
+      slope: last.slope != null ? last.slope : 0,
+      speed: last.speed != null ? last.speed : 12,
+      modality: null,
+      startedTs: Date.now(),
+    };
+    save();
+    requestWake();
+    go('sprint', { week, dayIndex });
+    return;
+  }
 
   const slots = slotsFor(j, week, type);
   if (!slots.length) {
@@ -425,14 +442,16 @@ function startSprint(secs) {
 }
 
 function sprintRepDone() {
-  if (!Array.isArray(view.spDone) || !timer) return;
-  view.spDone.push({
-    kind: view.spDone.length < 2 ? 'warm' : 'work',
+  const c = S.current;
+  if (!c || c.phase !== 'sprint' || !Array.isArray(c.sprints) || !timer) return;
+  c.sprints.push({
+    kind: c.sprints.length < 2 ? 'warm' : 'work',
     secs: timer.total,
-    slope: view.spSlope,
-    speed: view.spSpeed,
+    slope: c.slope,
+    speed: c.speed,
   });
   stopTimer();
+  save();
   render();
 }
 
@@ -440,16 +459,18 @@ function cancelSprintRep() { stopTimer(); render(); }
 
 function finishSprintSession(week, dayIndex) {
   const j = journey();
-  if (!j) { go('home'); return; }
-  const done = view.spDone || [];
+  const c = S.current;
+  if (!j || !c || c.phase !== 'sprint') { go('home'); return; }
+  const done = c.sprints || [];
   const work = done.filter((x) => x.kind === 'work').length;
   const activeSecs = done.reduce((a, x) => a + x.secs, 0);
-  S.lastSprintMod = view.spMod;
-  S.lastSprint = { slope: view.spSlope, speed: view.spSpeed };
+  S.lastSprintMod = c.modality;
+  S.lastSprint = { slope: c.slope, speed: c.speed };
+  S.current = null;
   pushSession({
     journeyId: j.id, week, dayIndex, dayType: 'SPRINT',
     sprint: {
-      modality: view.spMod, intervals: work,
+      modality: c.modality, intervals: work,
       minutes: Math.round(activeSecs / 60 * 10) / 10,
       sprints: done,
     },
@@ -724,10 +745,15 @@ function vHome() {
   let html = `<h1>5+2 <span class="muted small">· ${esc(j.name)}</span></h1>`;
 
   if (S.current) {
+    const isSprint = S.current.phase === 'sprint';
     html += `<div class="card highlight">
       <h3>Session in progress</h3>
-      <p class="muted">Week ${S.current.week} · ${dayLabel(S.current.dayType)} · Round ${S.current.round}/5</p>
-      <button class="btn-primary mt" onclick="go('workout')">Resume</button>
+      <p class="muted">Week ${S.current.week} · ${dayLabel(S.current.dayType)} · ${isSprint
+        ? (S.current.sprints || []).length + '/8 sprints done'
+        : 'Round ' + S.current.round + '/5'}</p>
+      <button class="btn-primary mt" onclick="${isSprint
+        ? `go('sprint', { week: ${S.current.week}, dayIndex: ${S.current.dayIndex} })`
+        : `go('workout')`}">Resume</button>
       <button class="btn-ghost btn-big mt" onclick="abandonSession()">Discard</button>
     </div>`;
   } else if (next) {
@@ -900,17 +926,30 @@ function updateClock() {
 }
 
 function vSprint() {
-  const w = view.week, d = view.dayIndex;
   const mods = S.settings.travelMode ? TRAVEL_SPRINT_MODALITIES : SPRINT_MODALITIES;
-  if (!Array.isArray(view.spDone)) {
+  let c = S.current;
+  if (!c || c.phase !== 'sprint') {
+    // reached without startSession (stale link) — set up a fresh persistent session
     stopTimer();
-    view.spDone = [];
+    const j = journey();
+    if (!j) return `<div class="card"><h3>No journey found</h3></div>`;
     const last = S.lastSprint || {};
-    view.spSlope = last.slope != null ? last.slope : 0;
-    view.spSpeed = last.speed != null ? last.speed : 12;
+    c = S.current = {
+      journeyId: j.id,
+      week: clampNum(view.week, 1, j.weekCount, 1),
+      dayIndex: clampNum(view.dayIndex, 0, 6, 0),
+      dayType: 'SPRINT', phase: 'sprint',
+      sprints: [],
+      slope: last.slope != null ? last.slope : 0,
+      speed: last.speed != null ? last.speed : 12,
+      modality: null,
+      startedTs: Date.now(),
+    };
+    save();
   }
-  if (!view.spMod || !mods.includes(view.spMod)) view.spMod = mods.includes(S.lastSprintMod) ? S.lastSprintMod : mods[0];
-  const n = view.spDone.length;
+  const w = c.week, d = c.dayIndex;
+  if (!c.modality || !mods.includes(c.modality)) c.modality = mods.includes(S.lastSprintMod) ? S.lastSprintMod : mods[0];
+  const n = c.sprints.length;
   const isWarm = n < 2;
   const secs = isWarm ? 30 : 20;
   const canFinish = n >= 6;   // 2 warm-ups + 4 sprints
@@ -918,7 +957,7 @@ function vSprint() {
   const running = !!timer && timer.sprint;
   const rem = remainingSecs();
   const label = isWarm ? 'Warm-up ' + (n + 1) + ' of 2 · 30 s' : 'Sprint ' + (n - 1) + ' of 6 · 20 s';
-  const doneRows = view.spDone.map((sp, i) =>
+  const doneRows = c.sprints.map((sp, i) =>
     `<div class="set-row"><span>${i < 2 ? 'Warm-up ' + (i + 1) : 'Sprint ' + (i - 1)} · ${sp.secs} s</span>
       <span class="muted small">${sp.speed} km/h · ${sp.slope} %</span></div>`).join('');
   let main;
@@ -940,15 +979,15 @@ function vSprint() {
       <p class="muted small">Set the treadmill first. The clock starts 1 second after the tap.</p>
       <div class="row mt" style="justify-content:center; gap:1rem; flex-wrap:wrap">
         <div class="stepper">
-          <button onclick="view.spSpeed=Math.max(0,Math.round((view.spSpeed-0.5)*2)/2);render()" aria-label="slower">−</button>
-          <input class="val" inputmode="decimal" value="${view.spSpeed}" onchange="view.spSpeed=clampNum(this.value,0,30,12);render()" aria-label="speed in km per h">
-          <button onclick="view.spSpeed=Math.min(30,Math.round((view.spSpeed+0.5)*2)/2);render()" aria-label="faster">+</button>
+          <button onclick="S.current.speed=Math.max(0,Math.round((S.current.speed-0.5)*2)/2);scheduleSave();render()" aria-label="slower">−</button>
+          <input class="val" inputmode="decimal" value="${c.speed}" onchange="S.current.speed=clampNum(this.value,0,30,12);scheduleSave();render()" aria-label="speed in km per h">
+          <button onclick="S.current.speed=Math.min(30,Math.round((S.current.speed+0.5)*2)/2);scheduleSave();render()" aria-label="faster">+</button>
           <span class="unit">km/h</span>
         </div>
         <div class="stepper">
-          <button onclick="view.spSlope=Math.max(0,Math.round((view.spSlope-0.5)*2)/2);render()" aria-label="less slope">−</button>
-          <input class="val" inputmode="decimal" value="${view.spSlope}" onchange="view.spSlope=clampNum(this.value,0,15,0);render()" aria-label="slope percent">
-          <button onclick="view.spSlope=Math.min(15,Math.round((view.spSlope+0.5)*2)/2);render()" aria-label="more slope">+</button>
+          <button onclick="S.current.slope=Math.max(0,Math.round((S.current.slope-0.5)*2)/2);scheduleSave();render()" aria-label="less slope">−</button>
+          <input class="val" inputmode="decimal" value="${c.slope}" onchange="S.current.slope=clampNum(this.value,0,15,0);scheduleSave();render()" aria-label="slope percent">
+          <button onclick="S.current.slope=Math.min(15,Math.round((S.current.slope+0.5)*2)/2);scheduleSave();render()" aria-label="more slope">+</button>
           <span class="unit">%</span>
         </div>
       </div>
@@ -961,12 +1000,13 @@ function vSprint() {
     ${n === 0 && !running ? `<div class="card">
       <h3>Modality</h3>
       <div class="modality-grid">${mods.map((m) =>
-        `<button class="${view.spMod === m ? 'sel' : ''}" onclick="view.spMod='${m}';render()">${m}</button>`).join('')}</div>
+        `<button class="${c.modality === m ? 'sel' : ''}" onclick="S.current.modality='${m}';scheduleSave();render()">${m}</button>`).join('')}</div>
     </div>` : ''}
     ${main}
     ${n > 0 ? `<div class="card"><h3>Done</h3>${doneRows}</div>` : ''}
     ${canFinish && !running ? `<button class="${maxed ? 'btn-primary' : 'btn-big'} mb" onclick="finishSprintSession(${w},${d})">Finish session · ${n - 2} sprints</button>` : ''}
-    ${n > 0 && !canFinish && !running ? `<p class="muted small center mb">Finish unlocks after 4 sprints (2 warm-ups + 4).</p>` : ''}`;
+    ${n > 0 && !canFinish && !running ? `<p class="muted small center mb">Finish unlocks after 4 sprints (2 warm-ups + 4).</p>` : ''}
+    ${n > 0 && !running ? `<button class="btn-ghost btn-big mb" onclick="abandonSession()">Discard session</button>` : ''}`;
 }
 
 function weekReview(w) {

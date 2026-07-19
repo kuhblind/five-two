@@ -318,9 +318,11 @@ function normalizeState(state) {
   const c = state.current;
   if (c) {
     const okShape = c.journeyId && state.journeys.find((j) => j.id === c.journeyId)
-      && c.round >= 1 && c.round <= 5 && ['readiness', 'lift', 'cardio', 'effort'].includes(c.phase)
-      && Array.isArray(c.sets) && Array.isArray(c.cardio)
-      && (c.phase === 'readiness' || (Array.isArray(c.slots) && c.slots.length > 0));
+      && (c.phase === 'sprint'
+        ? Array.isArray(c.sprints) && c.sprints.length <= 8
+        : (c.round >= 1 && c.round <= 5 && ['readiness', 'lift', 'cardio', 'effort'].includes(c.phase)
+          && Array.isArray(c.sets) && Array.isArray(c.cardio)
+          && (c.phase === 'readiness' || (Array.isArray(c.slots) && c.slots.length > 0))));
     if (!okShape) state.current = null;
   }
 
