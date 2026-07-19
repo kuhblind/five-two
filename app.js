@@ -529,8 +529,12 @@ function render() {
         'Ten to fifteen minutes after the last cardio burst. Lower the heart rate, stretch what you trained, breathe, refuel. This marks the end of the session.'),
     };
     $app.innerHTML = (views[view.name] || vHome)() + navBar();
+    // fire phase: cardio bursts + sprint day carry the Fire accent, strength stays Earth amber
+    document.body.classList.toggle('fire-phase',
+      (view.name === 'workout' && S.current && S.current.phase === 'cardio') || view.name === 'sprint');
   } catch (e) {
     console.error('render failed', e);
+    document.body.classList.remove('fire-phase');
     $app.innerHTML = `<div class="card mt">
       <h3>Something went wrong</h3>
       <p class="muted small">${esc(e.message)}</p>

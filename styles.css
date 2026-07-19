@@ -38,9 +38,25 @@
   --glow: rgba(245, 184, 46, 0.22);
   --on-accent: #1d1300;
   --danger: #ff8d80;
+  --brand: #f5b82e;
   --radius: 18px;
   --radius-s: 14px;
   --display: 'Barlow Condensed', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* fire phase (Wu Xing): cardio bursts + sprint day flip the accent from Earth amber
+   to vermillion Fire; brand chrome (nav) stays amber via --brand */
+body.fire-phase {
+  --accent: #ff5a3c;
+  --accent-hi: #ff7d55;
+  --accent-lo: #e8431f;
+  --glow: rgba(255, 90, 60, 0.24);
+  --on-accent: #2b0d04;
+}
+body.fire-phase .timer-clock { color: var(--accent); }
+body.fire-phase .banner {
+  background: rgba(255, 90, 60, 0.08);
+  border-color: rgba(255, 90, 60, 0.3);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -181,7 +197,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   transition: color 150ms ease-out, background-color 150ms ease-out;
 }
 .nav button .ico { display: block; }
-.nav button.active { color: var(--accent); background: rgba(245, 184, 46, 0.1); }
+.nav button.active { color: var(--brand); background: rgba(245, 184, 46, 0.1); }
 
 /* week grid */
 .wk-label {
