@@ -344,7 +344,7 @@ function commitRound() {
   });
   c.roundEntries = null;
   c.phase = 'cardio';
-  startTimer(S.settings.cardioMinutes * 60);
+  // timer stays armed until the user picks a modality and taps Start
   save(); render();
 }
 
@@ -781,7 +781,7 @@ function vWorkout() {
     <div class="timer-wrap">
       ${noTimer
         ? `<div class="timer-clock">${S.settings.cardioMinutes}:00</div>
-           <button class="btn-big" onclick="startTimer(S.settings.cardioMinutes * 60); render()">Start timer</button>`
+           <button class="btn-primary" onclick="startTimer(S.settings.cardioMinutes * 60); render()">Start timer</button>`
         : `<div class="timer-clock ${finished ? 'done' : ''} ${paused ? 'paused' : ''}" id="clock">${finished ? 'DONE' : mm + ':' + ss}</div>
            <div class="row" style="justify-content:center">
              ${finished ? '' : `<button onclick="togglePause()">${paused ? 'Resume' : 'Pause'}</button>`}
@@ -789,7 +789,7 @@ function vWorkout() {
              <button onclick="extendTimer(-30)">−30 s</button>
            </div>`}
     </div>
-    <button class="btn-primary" onclick="finishCardio()">${c.round >= 5 ? 'Finish workout' : 'Next round →'}</button>`;
+    <button class="${noTimer ? 'btn-big' : 'btn-primary'}" onclick="finishCardio()">${c.round >= 5 ? 'Finish workout' : 'Next round →'}</button>`;
 }
 
 function updateClock() {
