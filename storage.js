@@ -1,7 +1,7 @@
 /* storage.js — versioned localStorage persistence + normalization + export/import */
 
 const STORE_KEY = 'fivetwo.state';
-const STORE_VERSION = 9;
+const STORE_VERSION = 10;
 
 /* attr/url-safe id shape for anything interpolated into templates */
 const SAFE_ID_RE = /^[a-zA-Z0-9_-]+$/;
@@ -229,6 +229,30 @@ function migrate(state) {
       });
     });
     state.version = 9;
+  }
+
+  // v9 -> v10: no cable machine in the kit — cable chest fly and lat pulldown
+  // leave the library; their slots get the DB fly / chin-up equivalents.
+  // Same pattern as the v6 med-ball removal: remap ids in ALL journey blocks
+  // (customized days keep their customization, only the dead id is swapped),
+  // delete from the exercise map, leave session history untouched.
+  if (state.version === 9) {
+    const SWAP = { cable_chest_fly: 'incline_db_fly', lat_pulldown: 'chin_up' };
+    (state.journeys || []).forEach((j) => {
+      if (!j.blocks) return;
+      ['early', 'late'].forEach((b) => {
+        if (!j.blocks[b]) return;
+        Object.keys(j.blocks[b]).forEach((day) => {
+          if (!Array.isArray(j.blocks[b][day])) return;
+          j.blocks[b][day] = j.blocks[b][day].map((id) => SWAP[id] || id);
+        });
+      });
+    });
+    if (state.exercises) {
+      delete state.exercises.cable_chest_fly;
+      delete state.exercises.lat_pulldown;
+    }
+    state.version = 10;
   }
   return state;
 }
