@@ -372,7 +372,7 @@ const TRAVEL_SUBS = {
   seated_calf_raise: 'calf_raise',
 };
 
-const TRAVEL_CARDIO = ['Skipping', 'Shadow boxing', 'Burpees', 'High knees', 'Stair runs'];
+const TRAVEL_CARDIO = ['Skipping', 'Shadow boxing', 'Burpees', 'High knees', 'Stair runs', 'Running'];
 const TRAVEL_SPRINT_MODALITIES = ['Stair runs', 'Burpees', 'Shadow boxing', 'High knees'];
 
 // Slot order = accumulator frequency: A done 5x per session, B 4x ... E 1x.
