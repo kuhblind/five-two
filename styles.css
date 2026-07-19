@@ -33,8 +33,10 @@
   --text: #f4f1ea;
   --muted: #a49d8e;
   --accent: #f5b82e;
+  --accent-rgb: 245, 184, 46;
   --accent-hi: #ffca4f;
   --accent-lo: #eda315;
+  --accent-grad: linear-gradient(180deg, var(--accent-hi), var(--accent-lo));
   --glow: rgba(245, 184, 46, 0.22);
   --on-accent: #1d1300;
   --danger: #ff8d80;
@@ -48,32 +50,39 @@
    to vermillion Fire; brand chrome (nav) stays amber via --brand */
 body.fire-phase {
   --accent: #ff5a3c;
+  --accent-rgb: 255, 90, 60;
   --accent-hi: #ff7d55;
   --accent-lo: #e8431f;
+  /* redeclared so the nested var()s re-resolve against the fire values —
+     a custom property bakes its var() refs where it is declared */
+  --accent-grad: linear-gradient(180deg, var(--accent-hi), var(--accent-lo));
   --glow: rgba(255, 90, 60, 0.24);
   --on-accent: #2b0d04;
 }
 body.fire-phase .timer-clock { color: var(--accent); }
-body.fire-phase .banner {
-  background: rgba(255, 90, 60, 0.08);
-  border-color: rgba(255, 90, 60, 0.3);
-}
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 html { font-size: calc(20px * var(--font-scale)); }
 
 body {
-  background:
-    radial-gradient(110% 55% at 50% -5%, rgba(245, 184, 46, 0.07), transparent 62%),
-    linear-gradient(180deg, #121009, var(--bg) 40%);
-  background-attachment: fixed;
+  background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   min-height: 100vh;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* viewport-fixed backdrop layer: iOS Safari doesn't support
+   background-attachment: fixed on the body — a fixed pseudo-element does
+   composite correctly and paints once */
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(110% 55% at 50% -5%, rgba(245, 184, 46, 0.07), transparent 62%),
+    linear-gradient(180deg, #121009, var(--bg) 40%);
 }
 
 #app { max-width: 560px; margin: 0 auto; padding: 0.8rem 0.8rem 6.5rem; }
@@ -133,7 +142,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 
 .btn-primary {
-  background: linear-gradient(180deg, var(--accent-hi), var(--accent-lo));
+  background: var(--accent-grad);
   border-color: rgba(255, 210, 110, 0.55);
   color: var(--on-accent);
   font-family: var(--display);
@@ -186,8 +195,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   border-top: 1px solid var(--hairline);
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
   padding: 0.45rem 0 calc(0.45rem + env(safe-area-inset-bottom));
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 .nav button {
   background: none; border: none; color: var(--muted);
@@ -216,7 +225,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .week-grid .day .n {
   font-family: var(--display); font-size: 1.05rem; font-weight: 700; color: var(--text);
 }
-.week-grid .day.done { background: linear-gradient(180deg, var(--accent-hi), var(--accent-lo)); border-color: transparent; }
+.week-grid .day.done { background: var(--accent-grad); border-color: transparent; }
 .week-grid .day.done .n, .week-grid .day.done { color: var(--on-accent); }
 .week-grid .day.next { border: 2px solid var(--accent); box-shadow: 0 0 12px var(--glow); }
 
@@ -276,7 +285,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .modality-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; margin: 1rem 0; }
 .modality-grid button { font-size: 1rem; padding: 1rem 0.4rem; font-weight: 600; overflow: hidden; }
 .modality-grid button.sel {
-  background: linear-gradient(180deg, var(--accent-hi), var(--accent-lo));
+  background: var(--accent-grad);
   border-color: transparent; color: var(--on-accent);
   box-shadow: 0 4px 14px var(--glow);
 }
@@ -289,7 +298,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   transition: background-color 200ms ease-out;
 }
 .progress-dots .dot.done { background: var(--accent); }
-.progress-dots .dot.now { background: rgba(245, 184, 46, 0.45); box-shadow: 0 0 8px var(--glow); }
+.progress-dots .dot.now { background: rgba(var(--accent-rgb), 0.45); box-shadow: 0 0 8px var(--glow); }
 
 /* journal */
 .session-item {
@@ -325,8 +334,8 @@ label.field { display: block; margin: 0.8rem 0 0.3rem; color: var(--muted); font
 /* in-session banners (activation / deactivation / refuel) */
 .banner {
   display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
-  background: rgba(245, 184, 46, 0.08);
-  border: 1px solid rgba(245, 184, 46, 0.28);
+  background: rgba(var(--accent-rgb), 0.08);
+  border: 1px solid rgba(var(--accent-rgb), 0.28);
   border-radius: var(--radius-s);
   padding: 0.7rem 0.9rem;
   margin-bottom: 0.9rem;
@@ -344,8 +353,8 @@ label.field { display: block; margin: 0.8rem 0 0.3rem; color: var(--muted); font
   display: inline-block; margin: 0.45rem 0 0.1rem;
   padding: 0.35rem 0.7rem; border-radius: 999px;
   font-size: 0.78rem; font-weight: 700;
-  background: rgba(245, 184, 46, 0.12); color: var(--accent);
-  border: 1px solid rgba(245, 184, 46, 0.4);
+  background: rgba(var(--accent-rgb), 0.12); color: var(--accent);
+  border: 1px solid rgba(var(--accent-rgb), 0.4);
 }
 .sugg-chip:not(.on) { background: transparent; color: var(--muted); border-color: var(--border); }
 
@@ -364,7 +373,7 @@ label.field { display: block; margin: 0.8rem 0 0.3rem; color: var(--muted); font
 
 .fresh-hint {
   margin: 0.4rem 0 0.1rem; padding: 0.4rem 0.7rem;
-  background: rgba(245, 184, 46, 0.06); border-radius: 8px;
+  background: rgba(var(--accent-rgb), 0.06); border-radius: 8px;
 }
 
 /* effort chips */
@@ -386,7 +395,7 @@ label.field { display: block; margin: 0.8rem 0 0.3rem; color: var(--muted); font
   color: var(--muted);
 }
 .z2check.on {
-  background: linear-gradient(180deg, var(--accent-hi), var(--accent-lo));
+  background: var(--accent-grad);
   border-color: transparent; color: var(--on-accent);
   box-shadow: 0 4px 14px var(--glow);
 }

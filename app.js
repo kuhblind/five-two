@@ -178,26 +178,35 @@ function bucketTop(bucket) {
    weight, so anchor ramp rounds don't block the call. */
 function progressionSuggestion(exId) {
   const e = ex(exId);
-  if (!e || e.measure !== 'reps' || !e.bucket || e.travel) return null;
+  const j = journey();
+  if (!j || !e || e.measure !== 'reps' || !e.bucket || e.travel) return null;
   if (S.settings.travelMode) return null; // second stepper is band level, not kg
   const top = bucketTop(e.bucket);
   if (!top) return null;
   const appearances = [];
   for (let i = S.sessions.length - 1; i >= 0 && appearances.length < 2; i--) {
     const s = S.sessions[i];
-    if (s.travel) continue;
+    if (s.travel || s.journeyId !== j.id) continue;
     const sets = (s.sets || []).filter((x) => x.ex === exId);
     if (sets.length) appearances.push(sets);
   }
   if (appearances.length < 2) return null;
-  const w = Math.max(...appearances[0].map((x) => x.weight || 0));
-  for (const sets of appearances) {
-    const maxW = Math.max(...sets.map((x) => x.weight || 0));
-    if (maxW !== w) return null; // weight already moved between the two
-    const work = sets.filter((x) => (x.weight || 0) === maxW);
+  const maxes = appearances.map((sets) => Math.max(...sets.map((x) => x.weight || 0)));
+  if (maxes[0] !== maxes[1]) return null; // weight already moved between the two
+  const w = maxes[0];
+  // at 0 kg only loadable bodyweight moves (pull-up, dip) graduate to added load;
+  // burpees, jumps and band drills never get a kg suggestion
+  if (w === 0 && !e.loadable) return null;
+  for (let k = 0; k < appearances.length; k++) {
+    const work = appearances[k].filter((x) => (x.weight || 0) === maxes[k]);
     if (!work.length || !work.every((x) => x.amount >= top)) return null;
   }
-  return { from: w, add: 2.5, bucket: e.bucket };
+  const add = Math.max(2.5, S.settings.weightStep || 2.5);
+  return { from: w, add, bucket: e.bucket };
+}
+
+function suggApplied(en) {
+  return !!en.sugg && en.weight === en.sugg.from + en.sugg.add;
 }
 
 function beep() {
@@ -331,7 +340,6 @@ function initRound() {
       skipped: false,
       info: false,
       sugg: sug,
-      suggOn: !!sug,
     };
   });
 }
@@ -366,8 +374,9 @@ function toggleEntrySkip(i) {
 function toggleSugg(i) {
   const en = entryAt(i);
   if (!en || !en.sugg) return;
-  en.suggOn = !en.suggOn;
-  en.weight = en.suggOn ? en.sugg.from + en.sugg.add : en.sugg.from;
+  // applied-state is derived from the weight itself, so manual stepper edits
+  // can never leave a stale chip label behind
+  en.weight = suggApplied(en) ? en.sugg.from : en.sugg.from + en.sugg.add;
   scheduleSave(); render();
 }
 
@@ -772,7 +781,7 @@ function vWorkout() {
             <span class="pattern-ico">${patternIcon(e.pattern, 34)}</span>
             <div>
               <div class="exname">${'ABCDE'[i]} · ${esc(e.name)}</div>
-              <div class="target">${en.skipped ? 'skipped — will not be logged' : (e.bucket ? 'target ' + e.bucket + ' reps' : 'time-based')}</div>
+              <div class="target">${en.skipped ? 'skipped — will not be logged' : (e.bucket ? 'target ' + esc(e.bucket) + ' reps' : 'time-based')}</div>
             </div>
           </div>
           <div class="row" style="gap:0.4rem">
@@ -780,8 +789,8 @@ function vWorkout() {
             <button class="btn-small ${en.skipped ? '' : 'btn-ghost'}" onclick="toggleEntrySkip(${i})" aria-label="skip this exercise">${en.skipped ? 'Undo' : 'Skip'}</button>
           </div>
         </div>
-        ${en.sugg && !en.skipped ? `<button class="sugg-chip ${en.suggOn ? 'on' : ''}" onclick="toggleSugg(${i})">${en.suggOn
-          ? '↑ +' + en.sugg.add + ' kg — topped ' + en.sugg.bucket + ' twice · tap to undo'
+        ${en.sugg && !en.skipped && !S.settings.travelMode ? `<button class="sugg-chip ${suggApplied(en) ? 'on' : ''}" onclick="toggleSugg(${i})">${suggApplied(en)
+          ? '↑ +' + en.sugg.add + ' kg — topped ' + esc(en.sugg.bucket) + ' twice · tap to undo'
           : '↑ +' + en.sugg.add + ' kg suggested · tap to apply'}</button>` : ''}
         ${en.info ? `<p class="muted small how-to">${esc(e.desc || e.cue || 'No description yet.')}</p>` : ''}
         ${en.fresh && en.weight === 0 && isReps && !S.settings.travelMode ? `<p class="muted small fresh-hint">First time: think of your max weight, then go ~25% lighter.</p>` : ''}
@@ -843,8 +852,13 @@ function updateClock() {
   const el = document.getElementById('clock');
   if (!el || !timer) return;
   const secs = remainingSecs();
-  if (timer.finished) { el.textContent = 'DONE'; el.classList.add('done'); return; }
-  el.textContent = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+  if (timer.finished) {
+    if (el.textContent !== 'DONE') { el.textContent = 'DONE'; el.classList.add('done'); }
+    return;
+  }
+  const txt = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+  // the 250ms tick outpaces the 1s display — skip identical writes
+  if (el.textContent !== txt) el.textContent = txt;
 }
 
 function vSprint() {
@@ -885,21 +899,18 @@ function vSprint() {
 function weekReview(w) {
   const j = journey();
   if (!j) return null;
-  const wk = S.sessions.filter((s) => s.journeyId === j.id && s.week === w);
-  const training = wk.filter((s) => s.dayType !== 'REST');
+  const training = S.sessions.filter((s) => s.journeyId === j.id && s.week === w && s.dayType !== 'REST');
   const z2 = (S.zone2Checks[j.id + ':' + w] || []).filter(Boolean).length;
   const effort = { easy: 0, solid: 0, brutal: 0 };
   training.forEach((s) => { if (s.effort && effort[s.effort] !== undefined) effort[s.effort]++; });
-  // lifts that moved: this week's max weight vs best of all earlier weeks in this journey
-  const maxByEx = {};
-  training.forEach((s) => (s.sets || []).forEach((x) => {
-    if (x.weight > 0) maxByEx[x.ex] = Math.max(maxByEx[x.ex] || 0, x.weight);
-  }));
-  const prevMaxByEx = {};
+  // lifts that moved: this week's max kg vs best of all earlier weeks in this
+  // journey; travel sessions excluded — their weight field is a band level
+  const maxByEx = {}, prevMaxByEx = {};
   S.sessions.forEach((s) => {
-    if (s.journeyId !== j.id || s.week >= w) return;
+    if (s.journeyId !== j.id || s.travel || s.week > w) return;
+    const tgt = s.week === w ? maxByEx : prevMaxByEx;
     (s.sets || []).forEach((x) => {
-      if (x.weight > 0) prevMaxByEx[x.ex] = Math.max(prevMaxByEx[x.ex] || 0, x.weight);
+      if (x.weight > 0) tgt[x.ex] = Math.max(tgt[x.ex] || 0, x.weight);
     });
   });
   const moved = Object.keys(maxByEx)
@@ -907,13 +918,19 @@ function weekReview(w) {
     .map((id) => ({ id, from: prevMaxByEx[id], to: maxByEx[id] }))
     .sort((a, b) => (b.to - b.from) - (a.to - a.from))
     .slice(0, 3);
-  return { sessions: training.length, z2, effort, moved, b3: bigThreeWeekCount() };
+  return {
+    // distinct days, so re-logging a day can't fake a full week
+    sessions: new Set(training.map((s) => s.dayIndex)).size,
+    target: j.weekPlan.filter((t) => t !== 'REST').length,
+    z2, effort, moved, b3: bigThreeWeekCount(),
+  };
 }
 
 function reviewVerdict(r) {
-  if (r.sessions >= 6 && r.z2 >= 2) return 'Full week — everything on plan. Earn the rest.';
+  if (r.sessions >= r.target && r.z2 >= 2) return 'Full week — everything on plan. Earn the rest.';
   const gaps = [];
-  if (r.sessions < 6) gaps.push((6 - r.sessions) + ' session' + (6 - r.sessions === 1 ? '' : 's') + ' short');
+  const short = r.target - r.sessions;
+  if (short > 0) gaps.push(short + ' session' + (short === 1 ? '' : 's') + ' short');
   if (r.z2 < 2) gaps.push('Zone 2 at ' + r.z2 + '/2');
   return 'Light week: ' + gaps.join(' · ') + '. Rest anyway — consistency beats catch-up.';
 }
@@ -926,9 +943,9 @@ function reviewCardHTML(w) {
   return `<div class="card">
     <h3>Week ${w} review</h3>
     <div class="review-stats">
-      <div class="stat"><span class="n">${r.sessions}<span class="of">/6</span></span><span class="lbl">Sessions</span></div>
+      <div class="stat"><span class="n">${r.sessions}<span class="of">/${r.target}</span></span><span class="lbl">Sessions</span></div>
       <div class="stat"><span class="n">${r.z2}<span class="of">/2</span></span><span class="lbl">Zone 2</span></div>
-      <div class="stat"><span class="n">${r.b3}<span class="of">/7</span></span><span class="lbl">Big Three</span></div>
+      <div class="stat"><span class="n">${r.b3}<span class="of">/7</span></span><span class="lbl">Big Three · 7d</span></div>
     </div>
     ${eff ? `<p class="muted small">Effort: ${eff}</p>` : ''}
     ${r.moved.length ? `<div class="mt">${r.moved.map((m) =>
@@ -1004,7 +1021,7 @@ function sessionDetailHTML(s) {
     return `<div class="set-row"><span>${esc(e.name)}</span><span class="muted small">${sets}</span></div>`;
   }).join('');
   const cardio = (s.cardio || []).map((cd) =>
-    `<div class="set-row"><span>Cardio ${cd.round}</span><span class="muted small">${esc(cd.modality)} · ${Math.round(cd.seconds / 60 * 10) / 10} min</span></div>`).join('');
+    `<div class="set-row"><span>Cardio ${cd.round}</span><span class="muted small">${esc(cd.modality)} · ${cd.seconds > 0 ? Math.round(cd.seconds / 60 * 10) / 10 + ' min' : 'skipped'}</span></div>`).join('');
   return lifts + cardio;
 }
 
@@ -1046,7 +1063,7 @@ function vProgress() {
       if (sets.length) {
         points.push({
           ts: s.ts,
-          maxW: Math.max(...sets.map((x) => x.weight)),
+          maxW: Math.max(...sets.map((x) => x.weight || 0)),
           topAmount: Math.max(...sets.map((x) => x.amount)),
         });
       }
@@ -1140,7 +1157,7 @@ function programDaysHTML(j) {
       <div class="row exhead">
         <span class="pattern-ico">${patternIcon(e.pattern, 30)}</span>
         <div><b>${'ABCDE'[i]}</b> · ${esc(e.name)}<br>
-          <span class="muted small">${e.bucket ? 'target ' + e.bucket : 'time-based'} · ${esc(e.group)}</span></div>
+          <span class="muted small">${e.bucket ? 'target ' + esc(e.bucket) : 'time-based'} · ${esc(e.group)}</span></div>
       </div>
       <button class="btn-small btn-ghost" onclick="view.editSlot=${i};render()">Swap</button>
     </div>`;

@@ -268,6 +268,20 @@ function normalizeState(state) {
       cur.name = e.name; cur.group = e.group; cur.measure = e.measure;
       cur.pattern = e.pattern; cur.cue = e.cue; cur.desc = e.desc;
       cur.travel = e.travel || false;
+      cur.loadable = e.loadable || false;
+    });
+  }
+  // bucket is user-owned but must be one of the known bucket strings: it is
+  // interpolated into HTML and parsed by bucketFloor/bucketTop, so an imported
+  // backup with a mangled bucket gets reset (seed value, else the compound default)
+  if (typeof BUCKETS !== 'undefined') {
+    const seedBucket = {};
+    if (typeof SEED_EXERCISES !== 'undefined') SEED_EXERCISES.forEach((e) => { seedBucket[e.id] = e.bucket; });
+    Object.keys(state.exercises).forEach((id) => {
+      const cur = state.exercises[id];
+      if (cur.bucket != null && !BUCKETS.includes(cur.bucket)) {
+        cur.bucket = seedBucket[id] || '9-12';
+      }
     });
   }
 
