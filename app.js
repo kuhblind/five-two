@@ -408,10 +408,55 @@ function timerTick() {
     clearInterval(timer.interval);
     beep();
     if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
+    if (timer.sprint && view.name === 'sprint') { sprintRepDone(); return; }
     if (view.name === 'workout') render();
     return;
   }
-  if (view.name === 'workout') updateClock();
+  if (view.name === 'workout' || view.name === 'sprint') updateClock();
+}
+
+/* guided sprint: tap -> 1 s lead-in -> countdown -> auto-log */
+function startSprint(secs) {
+  stopTimer();
+  requestWake();
+  timer = { endTs: Date.now() + 1000 + secs * 1000, total: secs, finished: false, paused: false, pausedLeft: 0, sprint: true };
+  armTick();
+  render();
+}
+
+function sprintRepDone() {
+  if (!Array.isArray(view.spDone) || !timer) return;
+  view.spDone.push({
+    kind: view.spDone.length < 2 ? 'warm' : 'work',
+    secs: timer.total,
+    slope: view.spSlope,
+    speed: view.spSpeed,
+  });
+  stopTimer();
+  render();
+}
+
+function cancelSprintRep() { stopTimer(); render(); }
+
+function finishSprintSession(week, dayIndex) {
+  const j = journey();
+  if (!j) { go('home'); return; }
+  const done = view.spDone || [];
+  const work = done.filter((x) => x.kind === 'work').length;
+  const activeSecs = done.reduce((a, x) => a + x.secs, 0);
+  S.lastSprintMod = view.spMod;
+  S.lastSprint = { slope: view.spSlope, speed: view.spSpeed };
+  pushSession({
+    journeyId: j.id, week, dayIndex, dayType: 'SPRINT',
+    sprint: {
+      modality: view.spMod, intervals: work,
+      minutes: Math.round(activeSecs / 60 * 10) / 10,
+      sprints: done,
+    },
+  });
+  stopTimer();
+  releaseWake();
+  go('home');
 }
 
 function armTick() {
@@ -431,7 +476,8 @@ function stopTimer() { if (timer && timer.interval) clearInterval(timer.interval
 function remainingSecs() {
   if (!timer) return 0;
   if (timer.paused) return timer.pausedLeft;
-  return Math.max(0, Math.ceil((timer.endTs - Date.now()) / 1000));
+  // capped at total so a lead-in delay (sprint start) displays the full time
+  return Math.min(timer.total, Math.max(0, Math.ceil((timer.endTs - Date.now()) / 1000)));
 }
 
 function togglePause() {
@@ -523,15 +569,6 @@ function abandonSession() {
   go('home');
 }
 
-function saveSprint(week, dayIndex, modality, intervals, minutes) {
-  const j = journey();
-  if (!j) { go('home'); return; }
-  pushSession({
-    journeyId: j.id, week, dayIndex, dayType: 'SPRINT',
-    sprint: { modality, intervals: clampNum(intervals, 1, 50, 8), minutes: clampNum(minutes, 5, 120, 20) },
-  });
-  go('home');
-}
 
 function saveRest(week, dayIndex) {
   const j = journey();
@@ -697,7 +734,7 @@ function vHome() {
     const type = dayType(j, next.dayIndex);
     const slots = slotsFor(j, next.week, type);
     const detail = type === 'REST' ? '<p class="muted">Rest & recover — adaptation happens today.</p>'
-      : type === 'SPRINT' ? '<p class="muted">Sprint intervals — run, bike, row or stepper.</p>'
+      : type === 'SPRINT' ? '<p class="muted">2 warm-ups (30 s) + up to 6 sprints (20 s), with slope and speed logged.</p>'
       : `<p class="muted small">${slots.map((id, i) => `${'ABCDE'[i]} ${esc(ex(travelEx(id)).name)}`).join(' · ')}</p>`;
     html += `<div class="card highlight">
       <div class="row spread"><h3>Next up</h3>${dayBadge(type)}</div>
@@ -856,7 +893,8 @@ function updateClock() {
     if (el.textContent !== 'DONE') { el.textContent = 'DONE'; el.classList.add('done'); }
     return;
   }
-  const txt = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+  // sprints show bare seconds, cardio shows m:ss
+  const txt = timer.sprint ? String(secs) : Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
   // the 250ms tick outpaces the 1s display — skip identical writes
   if (el.textContent !== txt) el.textContent = txt;
 }
@@ -864,36 +902,71 @@ function updateClock() {
 function vSprint() {
   const w = view.week, d = view.dayIndex;
   const mods = S.settings.travelMode ? TRAVEL_SPRINT_MODALITIES : SPRINT_MODALITIES;
+  if (!Array.isArray(view.spDone)) {
+    stopTimer();
+    view.spDone = [];
+    const last = S.lastSprint || {};
+    view.spSlope = last.slope != null ? last.slope : 0;
+    view.spSpeed = last.speed != null ? last.speed : 12;
+  }
   if (!view.spMod || !mods.includes(view.spMod)) view.spMod = mods.includes(S.lastSprintMod) ? S.lastSprintMod : mods[0];
-  if (!view.spInt) view.spInt = 8;
-  if (!view.spMin) view.spMin = 20;
+  const n = view.spDone.length;
+  const isWarm = n < 2;
+  const secs = isWarm ? 30 : 20;
+  const canFinish = n >= 6;   // 2 warm-ups + 4 sprints
+  const maxed = n >= 8;       // 2 warm-ups + 6 sprints
+  const running = !!timer && timer.sprint;
+  const rem = remainingSecs();
+  const label = isWarm ? 'Warm-up ' + (n + 1) + ' of 2 · 30 s' : 'Sprint ' + (n - 1) + ' of 6 · 20 s';
+  const doneRows = view.spDone.map((sp, i) =>
+    `<div class="set-row"><span>${i < 2 ? 'Warm-up ' + (i + 1) : 'Sprint ' + (i - 1)} · ${sp.secs} s</span>
+      <span class="muted small">${sp.speed} km/h · ${sp.slope} %</span></div>`).join('');
+  let main;
+  if (running) {
+    main = `<div class="card highlight">
+      <h3 class="center">${label}</h3>
+      <div class="timer-wrap">
+        <div class="timer-clock" id="clock">${rem}</div>
+        <p class="muted small">Go when the clock moves.</p>
+      </div>
+      <button class="btn-ghost btn-big" onclick="cancelSprintRep()">Cancel this sprint</button>
+    </div>`;
+  } else if (maxed) {
+    main = `<div class="card highlight"><h3>All 8 done</h3>
+      <p class="muted small">Two warm-ups and six sprints — full session. Save it below.</p></div>`;
+  } else {
+    main = `<div class="card highlight">
+      <h3>${label}</h3>
+      <p class="muted small">Set the treadmill first. The clock starts 1 second after the tap.</p>
+      <div class="row mt" style="justify-content:center; gap:1rem; flex-wrap:wrap">
+        <div class="stepper">
+          <button onclick="view.spSpeed=Math.max(0,Math.round((view.spSpeed-0.5)*2)/2);render()" aria-label="slower">−</button>
+          <input class="val" inputmode="decimal" value="${view.spSpeed}" onchange="view.spSpeed=clampNum(this.value,0,30,12);render()" aria-label="speed in km per h">
+          <button onclick="view.spSpeed=Math.min(30,Math.round((view.spSpeed+0.5)*2)/2);render()" aria-label="faster">+</button>
+          <span class="unit">km/h</span>
+        </div>
+        <div class="stepper">
+          <button onclick="view.spSlope=Math.max(0,Math.round((view.spSlope-0.5)*2)/2);render()" aria-label="less slope">−</button>
+          <input class="val" inputmode="decimal" value="${view.spSlope}" onchange="view.spSlope=clampNum(this.value,0,15,0);render()" aria-label="slope percent">
+          <button onclick="view.spSlope=Math.min(15,Math.round((view.spSlope+0.5)*2)/2);render()" aria-label="more slope">+</button>
+          <span class="unit">%</span>
+        </div>
+      </div>
+      <button class="btn-primary mt" onclick="startSprint(${secs})">Start · ${secs} s</button>
+    </div>`;
+  }
   return `<div class="topbar"><button onclick="go('home')" aria-label="back">←</button><span class="title">Sprint · Week ${w}</span></div>
     <div class="banner">Warm up properly first — sprinting cold is how you get hurt.
       <button class="btn-small btn-ghost" onclick="go('activation')">Ideas →</button></div>
-    <div class="card">
+    ${n === 0 && !running ? `<div class="card">
       <h3>Modality</h3>
       <div class="modality-grid">${mods.map((m) =>
         `<button class="${view.spMod === m ? 'sel' : ''}" onclick="view.spMod='${m}';render()">${m}</button>`).join('')}</div>
-      <h3 class="mt">Sprints</h3>
-      <div class="row" style="justify-content:center">
-        <div class="stepper">
-          <button onclick="view.spInt=Math.max(1,view.spInt-1);render()" aria-label="fewer sprints">−</button>
-          <input class="val" inputmode="numeric" value="${view.spInt}" onchange="view.spInt=Math.round(clampNum(this.value,1,50,8));render()" aria-label="sprints">
-          <button onclick="view.spInt=Math.min(50,view.spInt+1);render()" aria-label="more sprints">+</button>
-          <span class="unit">×</span>
-        </div>
-      </div>
-      <h3 class="mt">Total time</h3>
-      <div class="row" style="justify-content:center">
-        <div class="stepper">
-          <button onclick="view.spMin=Math.max(5,view.spMin-5);render()" aria-label="less minutes">−</button>
-          <input class="val" inputmode="numeric" value="${view.spMin}" onchange="view.spMin=Math.round(clampNum(this.value,5,120,20));render()" aria-label="minutes">
-          <button onclick="view.spMin=Math.min(120,view.spMin+5);render()" aria-label="more minutes">+</button>
-          <span class="unit">min</span>
-        </div>
-      </div>
-      <button class="btn-primary mt" onclick="S.lastSprintMod=view.spMod;saveSprint(${w},${d},view.spMod,view.spInt,view.spMin)">Save sprint session</button>
-    </div>`;
+    </div>` : ''}
+    ${main}
+    ${n > 0 ? `<div class="card"><h3>Done</h3>${doneRows}</div>` : ''}
+    ${canFinish && !running ? `<button class="${maxed ? 'btn-primary' : 'btn-big'} mb" onclick="finishSprintSession(${w},${d})">Finish session · ${n - 2} sprints</button>` : ''}
+    ${n > 0 && !canFinish && !running ? `<p class="muted small center mb">Finish unlocks after 4 sprints (2 warm-ups + 4).</p>` : ''}`;
 }
 
 function weekReview(w) {
@@ -1006,7 +1079,10 @@ function sessionDetailHTML(s) {
   }
   if (s.dayType === 'SPRINT') {
     const sp = s.sprint || { modality: '?', intervals: 0, minutes: 0 };
-    return `<p class="big">${esc(sp.modality)} · ${sp.intervals} sprints · ${sp.minutes} min</p>`;
+    const rows = Array.isArray(sp.sprints) ? sp.sprints.map((x, i) =>
+      `<div class="set-row"><span>${i < 2 ? 'Warm-up ' + (i + 1) : 'Sprint ' + (i - 1)} · ${x.secs} s</span>
+        <span class="muted small">${x.speed} km/h · ${x.slope} %</span></div>`).join('') : '';
+    return `<p class="big">${esc(sp.modality)} · ${sp.intervals} sprints · ${sp.minutes} min</p>${rows}`;
   }
   if (s.dayType === 'REST') {
     return '<p class="big">Recovery day ✓</p>';
