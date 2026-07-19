@@ -167,6 +167,39 @@ function bucketFloor(bucket) {
   return parseInt(bucket, 10) || 10;
 }
 
+function bucketTop(bucket) {
+  if (!bucket) return null;
+  const m = String(bucket).match(/(\d+)\s*\+?$/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/* double progression: bucket topped at the same working weight in the last two
+   gym appearances -> suggest +2.5 kg. Working sets = sets at that session's max
+   weight, so anchor ramp rounds don't block the call. */
+function progressionSuggestion(exId) {
+  const e = ex(exId);
+  if (!e || e.measure !== 'reps' || !e.bucket || e.travel) return null;
+  if (S.settings.travelMode) return null; // second stepper is band level, not kg
+  const top = bucketTop(e.bucket);
+  if (!top) return null;
+  const appearances = [];
+  for (let i = S.sessions.length - 1; i >= 0 && appearances.length < 2; i--) {
+    const s = S.sessions[i];
+    if (s.travel) continue;
+    const sets = (s.sets || []).filter((x) => x.ex === exId);
+    if (sets.length) appearances.push(sets);
+  }
+  if (appearances.length < 2) return null;
+  const w = Math.max(...appearances[0].map((x) => x.weight || 0));
+  for (const sets of appearances) {
+    const maxW = Math.max(...sets.map((x) => x.weight || 0));
+    if (maxW !== w) return null; // weight already moved between the two
+    const work = sets.filter((x) => (x.weight || 0) === maxW);
+    if (!work.length || !work.every((x) => x.amount >= top)) return null;
+  }
+  return { from: w, add: 2.5, bucket: e.bucket };
+}
+
 function beep() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -289,13 +322,16 @@ function initRound() {
     const inSession = c.sets.slice().reverse().find((s) => s.ex === exId);
     const prev = inSession || lastLogged(exId);
     const e = ex(exId);
+    const sug = (!inSession && prev) ? progressionSuggestion(exId) : null;
     return {
       ex: exId,
       amount: prev ? prev.amount : bucketFloor(e.bucket),
-      weight: prev ? prev.weight : 0,
+      weight: sug ? sug.from + sug.add : (prev ? prev.weight : 0),
       fresh: !prev,
       skipped: false,
       info: false,
+      sugg: sug,
+      suggOn: !!sug,
     };
   });
 }
@@ -324,6 +360,14 @@ function toggleEntrySkip(i) {
   const en = entryAt(i);
   if (!en) return;
   en.skipped = !en.skipped;
+  scheduleSave(); render();
+}
+
+function toggleSugg(i) {
+  const en = entryAt(i);
+  if (!en || !en.sugg) return;
+  en.suggOn = !en.suggOn;
+  en.weight = en.suggOn ? en.sugg.from + en.sugg.add : en.sugg.from;
   scheduleSave(); render();
 }
 
@@ -736,6 +780,9 @@ function vWorkout() {
             <button class="btn-small ${en.skipped ? '' : 'btn-ghost'}" onclick="toggleEntrySkip(${i})" aria-label="skip this exercise">${en.skipped ? 'Undo' : 'Skip'}</button>
           </div>
         </div>
+        ${en.sugg && !en.skipped ? `<button class="sugg-chip ${en.suggOn ? 'on' : ''}" onclick="toggleSugg(${i})">${en.suggOn
+          ? '↑ +' + en.sugg.add + ' kg — topped ' + en.sugg.bucket + ' twice · tap to undo'
+          : '↑ +' + en.sugg.add + ' kg suggested · tap to apply'}</button>` : ''}
         ${en.info ? `<p class="muted small how-to">${esc(e.desc || e.cue || 'No description yet.')}</p>` : ''}
         ${en.fresh && en.weight === 0 && isReps && !S.settings.travelMode ? `<p class="muted small fresh-hint">First time: think of your max weight, then go ~25% lighter.</p>` : ''}
         <div class="set-row">
@@ -835,6 +882,61 @@ function vSprint() {
     </div>`;
 }
 
+function weekReview(w) {
+  const j = journey();
+  if (!j) return null;
+  const wk = S.sessions.filter((s) => s.journeyId === j.id && s.week === w);
+  const training = wk.filter((s) => s.dayType !== 'REST');
+  const z2 = (S.zone2Checks[j.id + ':' + w] || []).filter(Boolean).length;
+  const effort = { easy: 0, solid: 0, brutal: 0 };
+  training.forEach((s) => { if (s.effort && effort[s.effort] !== undefined) effort[s.effort]++; });
+  // lifts that moved: this week's max weight vs best of all earlier weeks in this journey
+  const maxByEx = {};
+  training.forEach((s) => (s.sets || []).forEach((x) => {
+    if (x.weight > 0) maxByEx[x.ex] = Math.max(maxByEx[x.ex] || 0, x.weight);
+  }));
+  const prevMaxByEx = {};
+  S.sessions.forEach((s) => {
+    if (s.journeyId !== j.id || s.week >= w) return;
+    (s.sets || []).forEach((x) => {
+      if (x.weight > 0) prevMaxByEx[x.ex] = Math.max(prevMaxByEx[x.ex] || 0, x.weight);
+    });
+  });
+  const moved = Object.keys(maxByEx)
+    .filter((id) => prevMaxByEx[id] > 0 && maxByEx[id] > prevMaxByEx[id])
+    .map((id) => ({ id, from: prevMaxByEx[id], to: maxByEx[id] }))
+    .sort((a, b) => (b.to - b.from) - (a.to - a.from))
+    .slice(0, 3);
+  return { sessions: training.length, z2, effort, moved, b3: bigThreeWeekCount() };
+}
+
+function reviewVerdict(r) {
+  if (r.sessions >= 6 && r.z2 >= 2) return 'Full week — everything on plan. Earn the rest.';
+  const gaps = [];
+  if (r.sessions < 6) gaps.push((6 - r.sessions) + ' session' + (6 - r.sessions === 1 ? '' : 's') + ' short');
+  if (r.z2 < 2) gaps.push('Zone 2 at ' + r.z2 + '/2');
+  return 'Light week: ' + gaps.join(' · ') + '. Rest anyway — consistency beats catch-up.';
+}
+
+function reviewCardHTML(w) {
+  const r = weekReview(w);
+  if (!r) return '';
+  const eff = ['easy', 'solid', 'brutal'].filter((k) => r.effort[k] > 0)
+    .map((k) => `${r.effort[k]} ${k}`).join(' · ');
+  return `<div class="card">
+    <h3>Week ${w} review</h3>
+    <div class="review-stats">
+      <div class="stat"><span class="n">${r.sessions}<span class="of">/6</span></span><span class="lbl">Sessions</span></div>
+      <div class="stat"><span class="n">${r.z2}<span class="of">/2</span></span><span class="lbl">Zone 2</span></div>
+      <div class="stat"><span class="n">${r.b3}<span class="of">/7</span></span><span class="lbl">Big Three</span></div>
+    </div>
+    ${eff ? `<p class="muted small">Effort: ${eff}</p>` : ''}
+    ${r.moved.length ? `<div class="mt">${r.moved.map((m) =>
+      `<p class="small accent">↑ ${esc(ex(m.id).name)} ${m.from} → ${m.to} kg</p>`).join('')}</div>` : ''}
+    <p class="small mt">${reviewVerdict(r)}</p>
+  </div>`;
+}
+
 function vRest() {
   const w = view.week, d = view.dayIndex;
   return `<div class="topbar"><button onclick="go('home')" aria-label="back">←</button><span class="title">Rest · Week ${w}</span></div>
@@ -845,6 +947,7 @@ function vRest() {
       <p class="muted small mt">Knee work belongs on fresh days like this one, never after legs: wall sit holds (build toward 4 × 2 min, breathe throughout) and Spanish squats (4 × 45 s). Both are in the Library.</p>
       <button class="btn-primary mt" onclick="saveRest(${w},${d})">Mark rest day done</button>
     </div>
+    ${reviewCardHTML(w)}
     <div class="card">
       <h3>Ideas</h3>
       <p class="muted small">The deactivation page doubles as a rest-day menu — breathing, stretching doctrine, refuel.</p>
