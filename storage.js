@@ -1,7 +1,7 @@
 /* storage.js — versioned localStorage persistence + normalization + export/import */
 
 const STORE_KEY = 'fivetwo.state';
-const STORE_VERSION = 7;
+const STORE_VERSION = 8;
 
 /* attr/url-safe id shape for anything interpolated into templates */
 const SAFE_ID_RE = /^[a-zA-Z0-9_-]+$/;
@@ -154,6 +154,44 @@ function migrate(state) {
   if (state.version < 7) {
     state.bigThree = {};
     state.version = 7;
+  }
+  // v7 -> v8: leg days re-themed hinge-led (LEGS1) / squat-led (LEGS2).
+  // Frozen snapshots: days still matching the v7 seed get the v8 seed;
+  // customized days stay untouched.
+  if (state.version < 8) {
+    const OLD_V7 = {
+      early: {
+        LEGS1: ['box_squat', 'reverse_lunge', 'hip_thrust', 'box_step_up', 'band_lateral_walk'],
+        LEGS2: ['trap_bar_deadlift', 'bulgarian_split_squat', 'goblet_squat', 'calf_raise', 'wall_sit'],
+      },
+      late: {
+        LEGS1: ['paused_box_squat', 'deficit_reverse_lunge', 'single_leg_hip_thrust', 'lateral_box_step', 'band_matrix'],
+        LEGS2: ['trap_bar_deadlift', 'lateral_lunge', 'single_leg_rdl', 'jump_squat', 'wall_sit'],
+      },
+    };
+    const NEW_V8 = {
+      early: {
+        LEGS1: ['trap_bar_deadlift', 'box_squat', 'slider_leg_curl', 'farmers_carry', 'band_lateral_walk'],
+        LEGS2: ['box_squat', 'reverse_lunge', 'slider_leg_curl', 'seated_calf_raise', 'lateral_lunge'],
+      },
+      late: {
+        LEGS1: ['trap_bar_deadlift', 'box_squat', 'romanian_deadlift', 'slider_leg_curl', 'farmers_carry'],
+        LEGS2: ['paused_box_squat', 'bulgarian_split_squat', 'single_leg_rdl', 'seated_calf_raise', 'lateral_lunge'],
+      },
+    };
+    (state.journeys || []).forEach((j) => {
+      if (!j.blocks) return;
+      ['early', 'late'].forEach((b) => {
+        ['LEGS1', 'LEGS2'].forEach((day) => {
+          const cur = (j.blocks[b] || {})[day];
+          if (!Array.isArray(cur)) return;
+          if (JSON.stringify(cur) === JSON.stringify(OLD_V7[b][day])) {
+            j.blocks[b][day] = NEW_V8[b][day].slice();
+          }
+        });
+      });
+    });
+    state.version = 8;
   }
   return state;
 }

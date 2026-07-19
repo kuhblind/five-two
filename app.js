@@ -523,7 +523,7 @@ function render() {
       summary: vSummary, journal: vJournal, session: vSession, progress: vProgress,
       program: vProgram, settings: vSettings,
       activation: () => vReading('Activation', ACTIVATION_IDEAS,
-        'Ten minutes before the first exercise. Sequence: 5 min easy cardio → wake-up (cat-cow, bird dog, glute bridge) → joints (leg swings, hip circles, ankle rockers) → the stretches below → first ramp set. And check in: sleep, niggles, energy.',
+        'Ten minutes before the first exercise. Lower-body days: bike 5 min → cat-cow ×8 → glute bridge ×15 → band side-steps ×15 → ankle rockers ×10 per side → ramp sets. Upper days: swap in arm circles and band pull-aparts. Then check in: sleep, niggles, energy.',
         ACTIVATION_STRETCHES),
       deactivation: () => vReading('Deactivation', DEACTIVATION_IDEAS,
         'Ten to fifteen minutes after the last cardio burst. Lower the heart rate, stretch what you trained, breathe, refuel. This marks the end of the session.'),
@@ -838,6 +838,7 @@ function vRest() {
       <h3>Rest day</h3>
       <p class="muted">This is where the adaptation happens. Muscles grow between sessions, not during them.</p>
       <p class="muted small mt">Good uses of today: a long walk, stretching, sauna, early night, proper meals.</p>
+      <p class="muted small mt">Knee work belongs on fresh days like this one, never after legs: wall sit holds (build toward 4 × 2 min, breathe throughout) and Spanish squats (4 × 45 s). Both are in the Library.</p>
       <button class="btn-primary mt" onclick="saveRest(${w},${d})">Mark rest day done</button>
     </div>
     <div class="card">
