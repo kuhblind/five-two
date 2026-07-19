@@ -1,7 +1,7 @@
 /* storage.js — versioned localStorage persistence + normalization + export/import */
 
 const STORE_KEY = 'fivetwo.state';
-const STORE_VERSION = 8;
+const STORE_VERSION = 9;
 
 /* attr/url-safe id shape for anything interpolated into templates */
 const SAFE_ID_RE = /^[a-zA-Z0-9_-]+$/;
@@ -192,6 +192,43 @@ function migrate(state) {
       });
     });
     state.version = 8;
+  }
+  // v8 -> v9: leg days flipped (LEGS1 squat-led on day 1, LEGS2 hinge-led)
+  // and hip thrust restored to the hinge day. Frozen snapshots as always.
+  if (state.version < 9) {
+    const OLD_V8 = {
+      early: {
+        LEGS1: ['trap_bar_deadlift', 'box_squat', 'slider_leg_curl', 'farmers_carry', 'band_lateral_walk'],
+        LEGS2: ['box_squat', 'reverse_lunge', 'slider_leg_curl', 'seated_calf_raise', 'lateral_lunge'],
+      },
+      late: {
+        LEGS1: ['trap_bar_deadlift', 'box_squat', 'romanian_deadlift', 'slider_leg_curl', 'farmers_carry'],
+        LEGS2: ['paused_box_squat', 'bulgarian_split_squat', 'single_leg_rdl', 'seated_calf_raise', 'lateral_lunge'],
+      },
+    };
+    const NEW_V9 = {
+      early: {
+        LEGS1: ['box_squat', 'reverse_lunge', 'slider_leg_curl', 'seated_calf_raise', 'lateral_lunge'],
+        LEGS2: ['trap_bar_deadlift', 'box_squat', 'slider_leg_curl', 'hip_thrust', 'farmers_carry'],
+      },
+      late: {
+        LEGS1: ['paused_box_squat', 'bulgarian_split_squat', 'single_leg_rdl', 'seated_calf_raise', 'lateral_lunge'],
+        LEGS2: ['trap_bar_deadlift', 'box_squat', 'romanian_deadlift', 'slider_leg_curl', 'hip_thrust'],
+      },
+    };
+    (state.journeys || []).forEach((j) => {
+      if (!j.blocks) return;
+      ['early', 'late'].forEach((b) => {
+        ['LEGS1', 'LEGS2'].forEach((day) => {
+          const cur = (j.blocks[b] || {})[day];
+          if (!Array.isArray(cur)) return;
+          if (JSON.stringify(cur) === JSON.stringify(OLD_V8[b][day])) {
+            j.blocks[b][day] = NEW_V9[b][day].slice();
+          }
+        });
+      });
+    });
+    state.version = 9;
   }
   return state;
 }

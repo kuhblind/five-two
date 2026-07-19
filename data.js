@@ -349,18 +349,18 @@ const TRAVEL_SPRINT_MODALITIES = ['Stair runs', 'Burpees', 'Shadow boxing', 'Hig
 // A/B = anchor lifts. Weeks 1-3 (early) and 4-6 (late) blocks.
 const SEED_BLOCKS = {
   early: {
-    LEGS1:  ['trap_bar_deadlift', 'box_squat', 'slider_leg_curl', 'farmers_carry', 'band_lateral_walk'],
+    LEGS1:  ['box_squat', 'reverse_lunge', 'slider_leg_curl', 'seated_calf_raise', 'lateral_lunge'],
     UPPER1: ['pull_up', 'db_bench_press', 'overhead_press', 'chest_supported_row', 'ab_rollout'],
     MIXED1: ['box_jump', 'kb_swing', 'thruster', 'plank_to_pike', 'farmers_carry'],
-    LEGS2:  ['box_squat', 'reverse_lunge', 'slider_leg_curl', 'seated_calf_raise', 'lateral_lunge'],
+    LEGS2:  ['trap_bar_deadlift', 'box_squat', 'slider_leg_curl', 'hip_thrust', 'farmers_carry'],
     UPPER2: ['incline_db_press', 'lat_pulldown', 'dips', 'shoulder_matrix', 'face_pull'],
     MIXED2: ['burpee', 'walking_lunge', 'renegade_row', 'db_snatch', 'mountain_climbers'],
   },
   late: {
-    LEGS1:  ['trap_bar_deadlift', 'box_squat', 'romanian_deadlift', 'slider_leg_curl', 'farmers_carry'],
+    LEGS1:  ['paused_box_squat', 'bulgarian_split_squat', 'single_leg_rdl', 'seated_calf_raise', 'lateral_lunge'],
     UPPER1: ['weighted_pull_up', 'bench_press', 'arnold_press', 'single_arm_row', 'hanging_knee_raise'],
     MIXED1: ['broad_jump', 'kb_clean_press', 'db_snatch', 'mcgill_curl_up', 'suitcase_carry'],
-    LEGS2:  ['paused_box_squat', 'bulgarian_split_squat', 'single_leg_rdl', 'seated_calf_raise', 'lateral_lunge'],
+    LEGS2:  ['trap_bar_deadlift', 'box_squat', 'romanian_deadlift', 'slider_leg_curl', 'hip_thrust'],
     UPPER2: ['weighted_dip', 'chin_up', 'cable_chest_fly', 'lateral_raise', 'pallof_press'],
     MIXED2: ['devil_press', 'box_jump_over', 'sprawl', 'dead_bug', 'bear_crawl'],
   },
