@@ -666,7 +666,7 @@ function vHome() {
       days.push(`<div class="day ${isDone ? 'done' : ''} ${isNext ? 'next' : ''}" onclick="startSession(${w},${d})">
         <span class="n">${d + 1}</span><span>${dayLabel(dayType(j, d)).replace(' ', '')}</span></div>`);
     }
-    html += `<div class="muted small">Week ${w}</div><div class="week-grid">${days.join('')}</div>`;
+    html += `<div class="wk-label">Week ${w}</div><div class="week-grid">${days.join('')}</div>`;
   }
   return html;
 }

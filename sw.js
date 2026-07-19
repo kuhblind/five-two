@@ -1,8 +1,10 @@
 /* sw.js — cache-first offline shell */
-const CACHE = 'fivetwo-v14';
+const CACHE = 'fivetwo-v15';
 const ASSETS = [
   '.', 'index.html', 'styles.css', 'app.js', 'data.js', 'storage.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png',
+  'fonts/barlow-condensed-500.woff2', 'fonts/barlow-condensed-600.woff2',
+  'fonts/barlow-condensed-700.woff2',
 ];
 
 self.addEventListener('install', (e) => {
