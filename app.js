@@ -895,12 +895,10 @@ function vWorkout() {
   const paused = timer && timer.paused;
   return `<div class="topbar"><span class="title">${title}</span><span class="muted">Cardio ${c.round}/5</span></div>
     <div class="progress-dots">${dots}</div>
-    <div class="modality-grid">${cardioList().map((m) =>
-      `<button class="${c.lastModality === m ? 'sel' : ''}" onclick="pickModality('${m}')">${m}</button>`).join('')}</div>
     <div class="timer-wrap">
       ${noTimer
-        ? `<div class="timer-clock">${S.settings.cardioMinutes}:00</div>
-           <button class="btn-primary" onclick="startTimer(S.settings.cardioMinutes * 60); render()">Start timer</button>`
+        ? `<div class="timer-clock tappable" role="button" aria-label="start timer" onclick="startTimer(S.settings.cardioMinutes * 60); render()">${S.settings.cardioMinutes}:00</div>
+           <button class="btn-primary" onclick="startTimer(S.settings.cardioMinutes * 60); render()">Start timer · ${esc(c.lastModality)}</button>`
         : `<div class="timer-clock ${finished ? 'done' : ''} ${paused ? 'paused' : ''}" id="clock">${finished ? 'DONE' : mm + ':' + ss}</div>
            <div class="row" style="justify-content:center">
              ${finished ? '' : `<button onclick="togglePause()">${paused ? 'Resume' : 'Pause'}</button>`}
@@ -908,6 +906,8 @@ function vWorkout() {
              <button onclick="extendTimer(-30)">−30 s</button>
            </div>`}
     </div>
+    <div class="modality-grid">${cardioList().map((m) =>
+      `<button class="${c.lastModality === m ? 'sel' : ''}" onclick="pickModality('${m}')">${m}</button>`).join('')}</div>
     <button class="${noTimer ? 'btn-big' : 'btn-primary'}" onclick="finishCardio()">${c.round >= 5 ? 'Finish workout' : 'Next round →'}</button>`;
 }
 

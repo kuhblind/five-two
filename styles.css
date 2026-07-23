@@ -282,8 +282,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   letter-spacing: -0.02em; line-height: 1; margin: 0.8rem 0;
 }
 .timer-clock.done { color: var(--accent); text-shadow: 0 0 24px var(--glow); }
+.timer-clock.tappable { cursor: pointer; }
+.timer-clock.tappable:active { transform: scale(0.97); }
 .modality-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; margin: 1rem 0; }
-.modality-grid button { font-size: 1rem; padding: 1rem 0.4rem; font-weight: 600; overflow: hidden; }
+.modality-grid button { font-size: 0.95rem; padding: 0.75rem 0.4rem; font-weight: 600; overflow: hidden; }
 .modality-grid button.sel {
   background: var(--accent-grad);
   border-color: transparent; color: var(--on-accent);

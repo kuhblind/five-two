@@ -3,7 +3,7 @@
 const BUCKETS = ['3-5', '6-8', '9-12', '13-16', '17-20+'];
 
 const CARDIO_MODALITIES = [
-  'Run / Sprints', 'Bike', 'Row', 'Stepper',
+  'Treadmill', 'Bike', 'Row', 'Stepper',
   'Heavy bag', 'Battle ropes', 'Skipping', 'Plyo circuit',
 ];
 

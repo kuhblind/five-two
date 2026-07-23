@@ -295,6 +295,10 @@ function normalizeState(state) {
       cur.loadable = e.loadable || false;
     });
   }
+  // v24 rename: 'Run / Sprints' cardio modality became 'Treadmill'
+  if (state.lastModality === 'Run / Sprints') state.lastModality = 'Treadmill';
+  if (state.current && state.current.lastModality === 'Run / Sprints') state.current.lastModality = 'Treadmill';
+
   // bucket is user-owned but must be one of the known bucket strings: it is
   // interpolated into HTML and parsed by bucketFloor/bucketTop, so an imported
   // backup with a mangled bucket gets reset (seed value, else the compound default)
