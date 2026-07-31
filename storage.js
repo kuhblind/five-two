@@ -295,6 +295,14 @@ function normalizeState(state) {
       cur.loadable = e.loadable || false;
     });
   }
+  // missed-day marks: '<journeyId>:<week>:<dayIndex>' -> 'sick' | 'blocked'
+  if (!state.missed || typeof state.missed !== 'object' || Array.isArray(state.missed)) state.missed = {};
+  Object.keys(state.missed).forEach((k) => {
+    if (!/^[a-zA-Z0-9_-]+:\d+:\d+$/.test(k) || !['sick', 'blocked'].includes(state.missed[k])) {
+      delete state.missed[k];
+    }
+  });
+
   // v24 rename: 'Run / Sprints' cardio modality became 'Treadmill'
   if (state.lastModality === 'Run / Sprints') state.lastModality = 'Treadmill';
   if (state.current && state.current.lastModality === 'Run / Sprints') state.current.lastModality = 'Treadmill';

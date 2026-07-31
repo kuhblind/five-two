@@ -228,6 +228,14 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .week-grid .day.done { background: var(--accent-grad); border-color: transparent; }
 .week-grid .day.done .n, .week-grid .day.done { color: var(--on-accent); }
 .week-grid .day.next { border: 2px solid var(--accent); box-shadow: 0 0 12px var(--glow); }
+/* missed days: sick = red, blocked (no time) = orange */
+.week-grid .day.sick { background: linear-gradient(180deg, #e05752, #b7332e); border-color: transparent; }
+.week-grid .day.sick, .week-grid .day.sick .n { color: #2b0605; }
+.week-grid .day.blocked { background: linear-gradient(180deg, #f09a3e, #d1761a); border-color: transparent; }
+.week-grid .day.blocked, .week-grid .day.blocked .n { color: #2b1403; }
+
+.miss-sick { color: #ff9d99; border-color: rgba(224, 87, 82, 0.5); background: rgba(224, 87, 82, 0.12); }
+.miss-blocked { color: #ffc07d; border-color: rgba(240, 154, 62, 0.5); background: rgba(240, 154, 62, 0.12); }
 
 /* stepper */
 .stepper { display: flex; align-items: center; gap: 0.4rem; }

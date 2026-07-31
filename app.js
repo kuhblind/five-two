@@ -1,6 +1,6 @@
 /* app.js — 5+2 Journeys: views, accumulator engine, cardio timer, logging */
 
-let S = loadState() || seedState();
+let S = loadState() || normalizeState(seedState());
 saveState(S);
 
 let view = { name: 'home' };
@@ -128,14 +128,37 @@ function doneDaySet(j) {
   return done;
 }
 
+function missedKind(j, week, dayIndex) {
+  return (S.missed || {})[j.id + ':' + week + ':' + dayIndex] || null;
+}
+
+function markMissed(week, dayIndex, kind) {
+  const j = journey();
+  if (!j) return;
+  S.missed[j.id + ':' + week + ':' + dayIndex] = kind;
+  view.cant = false;
+  save(); render();
+}
+
 function nextSlot(j, done) {
   done = done || doneDaySet(j);
   for (let w = 1; w <= j.weekCount; w++) {
     for (let d = 0; d < 7; d++) {
-      if (!done.has(w + ':' + d)) return { week: w, dayIndex: d };
+      if (!done.has(w + ':' + d) && !missedKind(j, w, d)) return { week: w, dayIndex: d };
     }
   }
   return null;
+}
+
+/* legs rescue: a missed LEGS day this week may take over a later Upper/Mixed
+   slot (his hierarchy: legs beat upper); Sprint and Rest are never displaced */
+function legsRescueFor(j, week, dayIndex, type) {
+  if (!/^(UPPER1|UPPER2|MIXED1)$/.test(type)) return null;
+  return ['LEGS1', 'LEGS2'].find((lt) => {
+    const dIdx = j.weekPlan.indexOf(lt);
+    return dIdx >= 0 && dIdx < dayIndex && missedKind(j, week, dIdx)
+      && !S.sessions.some((s) => s.journeyId === j.id && s.week === week && s.dayType === lt);
+  }) || null;
 }
 
 function fmtDate(ts) {
@@ -255,6 +278,12 @@ function startSession(week, dayIndex) {
     S.current = null;
     stopTimer();
   }
+  const mk = missedKind(j, week, dayIndex);
+  if (mk) {
+    if (!confirm('This day is marked ' + (mk === 'sick' ? 'sick' : 'no time') + '. Clear the mark and train it now?')) return;
+    delete S.missed[j.id + ':' + week + ':' + dayIndex];
+    save();
+  }
   if (sessionFor(j.id, week, dayIndex)) {
     if (!confirm('This day is already logged. Log it again?')) return;
   }
@@ -275,14 +304,21 @@ function startSession(week, dayIndex) {
     return;
   }
 
-  const slots = slotsFor(j, week, type);
+  // legs rescue: offer to run the missed legs session in this slot instead
+  let sessionType = type;
+  const rescue = legsRescueFor(j, week, dayIndex, type);
+  if (rescue && confirm(dayLabel(rescue) + ' was missed this week. Do it now instead? ' + dayLabel(type) + ' is skipped this week.')) {
+    sessionType = rescue;
+  }
+
+  const slots = slotsFor(j, week, sessionType);
   if (!slots.length) {
     alert('This day has no exercises configured yet — add them under Program first.');
     go('program');
     return;
   }
   S.current = {
-    journeyId: j.id, week, dayIndex, dayType: type,
+    journeyId: j.id, week, dayIndex, dayType: sessionType,
     round: 1, phase: 'readiness',
     slots: null, readiness: null, effort: null,
     sets: [], cardio: [],
@@ -767,6 +803,14 @@ function vHome() {
       <p class="big">Week ${next.week} · Day ${next.dayIndex + 1}</p>
       ${detail}
       <button class="btn-primary mt" onclick="startSession(${next.week}, ${next.dayIndex})">Start</button>
+      ${view.cant
+        ? `<div class="row mt" style="justify-content:center">
+            <button class="btn-small miss-sick" onclick="markMissed(${next.week},${next.dayIndex},'sick')">Sick</button>
+            <button class="btn-small miss-blocked" onclick="markMissed(${next.week},${next.dayIndex},'blocked')">No time</button>
+            <button class="btn-small btn-ghost" onclick="view.cant=false;render()">Cancel</button>
+          </div>
+          <p class="muted small center mt" style="margin-top:0.5rem">Marks the day and moves on — the plan continues at the next slot. Tap a marked day later to clear it.</p>`
+        : `<button class="btn-small btn-ghost mt" onclick="view.cant=true;render()">Can’t train today?</button>`}
     </div>`;
     html += bigThreeCardHTML();
     html += zone2CardHTML(next.week);
@@ -776,15 +820,20 @@ function vHome() {
       <p class="muted">All ${j.weekCount} weeks done. Start a new journey in Settings.</p></div>`;
   }
 
-  // week grids
+  // week grids — done days show what was ACTUALLY trained (legs rescue can
+  // land a legs session on an upper slot)
+  const typeByDay = {};
+  S.sessions.forEach((s) => { if (s.journeyId === j.id) typeByDay[s.week + ':' + s.dayIndex] = s.dayType; });
   html += '<h2>Journey</h2>';
   for (let w = 1; w <= j.weekCount; w++) {
     const days = [];
     for (let d = 0; d < 7; d++) {
       const isDone = done.has(w + ':' + d);
+      const miss = missedKind(j, w, d);
       const isNext = next && next.week === w && next.dayIndex === d;
-      days.push(`<div class="day ${isDone ? 'done' : ''} ${isNext ? 'next' : ''}" onclick="startSession(${w},${d})">
-        <span class="n">${d + 1}</span><span>${dayLabel(dayType(j, d)).replace(' ', '')}</span></div>`);
+      const label = dayLabel((isDone && typeByDay[w + ':' + d]) || dayType(j, d)).replace(' ', '');
+      days.push(`<div class="day ${isDone ? 'done' : ''} ${!isDone && miss ? miss : ''} ${isNext ? 'next' : ''}" onclick="startSession(${w},${d})">
+        <span class="n">${d + 1}</span><span>${label}</span></div>`);
     }
     html += `<div class="wk-label">Week ${w}</div><div class="week-grid">${days.join('')}</div>`;
   }
@@ -1031,11 +1080,17 @@ function weekReview(w) {
     .map((id) => ({ id, from: prevMaxByEx[id], to: maxByEx[id] }))
     .sort((a, b) => (b.to - b.from) - (a.to - a.from))
     .slice(0, 3);
+  let sick = 0, blocked = 0;
+  for (let d = 0; d < 7; d++) {
+    const mk = missedKind(j, w, d);
+    if (mk === 'sick') sick++;
+    if (mk === 'blocked') blocked++;
+  }
   return {
     // distinct days, so re-logging a day can't fake a full week
     sessions: new Set(training.map((s) => s.dayIndex)).size,
     target: j.weekPlan.filter((t) => t !== 'REST').length,
-    z2, effort, moved, b3: bigThreeWeekCount(),
+    z2, effort, moved, sick, blocked, b3: bigThreeWeekCount(),
   };
 }
 
@@ -1045,7 +1100,13 @@ function reviewVerdict(r) {
   const short = r.target - r.sessions;
   if (short > 0) gaps.push(short + ' session' + (short === 1 ? '' : 's') + ' short');
   if (r.z2 < 2) gaps.push('Zone 2 at ' + r.z2 + '/2');
-  return 'Light week: ' + gaps.join(' · ') + '. Rest anyway — consistency beats catch-up.';
+  let v = 'Light week: ' + gaps.join(' · ') + '. Rest anyway — consistency beats catch-up.';
+  if (r.sick > 0 && r.sick >= (r.target - r.sessions)) {
+    v = 'Sick week: ' + r.sick + ' day' + (r.sick === 1 ? '' : 's') + ' marked. Recovery was the training — pick up at the next slot.';
+  } else if (r.sick + r.blocked > 0) {
+    v += ' (' + (r.sick ? r.sick + ' sick' : '') + (r.sick && r.blocked ? ', ' : '') + (r.blocked ? r.blocked + ' no-time' : '') + ')';
+  }
+  return v;
 }
 
 function reviewCardHTML(w) {
@@ -1454,7 +1515,7 @@ function newJourney() {
 function resetAll() {
   if (!confirm('Delete ALL data — journeys, sessions, everything?')) return;
   if (!confirm('Really sure? Consider exporting a backup first.')) return;
-  S = seedState();
+  S = normalizeState(seedState());
   stopTimer();
   releaseWake();
   save();

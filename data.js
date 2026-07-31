@@ -411,6 +411,7 @@ function seedState() {
     sessions: [],
     zone2Checks: {},
     bigThree: {},
+    missed: {},
     current: null,
   };
 }
