@@ -831,7 +831,9 @@ function vHome() {
       const isDone = done.has(w + ':' + d);
       const miss = missedKind(j, w, d);
       const isNext = next && next.week === w && next.dayIndex === d;
-      const label = dayLabel((isDone && typeByDay[w + ':' + d]) || dayType(j, d)).replace(' ', '');
+      const label = !isDone && miss
+        ? (miss === 'sick' ? 'Sick' : 'No time')
+        : dayLabel((isDone && typeByDay[w + ':' + d]) || dayType(j, d)).replace(' ', '');
       days.push(`<div class="day ${isDone ? 'done' : ''} ${!isDone && miss ? miss : ''} ${isNext ? 'next' : ''}" onclick="startSession(${w},${d})">
         <span class="n">${d + 1}</span><span>${label}</span></div>`);
     }
