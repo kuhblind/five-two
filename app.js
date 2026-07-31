@@ -1,4 +1,6 @@
 /* app.js — 5+2 Journeys: views, accumulator engine, cardio timer, logging */
+// keep in sync with the CACHE name in sw.js
+const APP_VERSION = 'v28';
 
 let S = loadState() || normalizeState(seedState());
 saveState(S);
@@ -1493,7 +1495,8 @@ function vSettings() {
     <div class="card">
       <h3>Danger zone</h3>
       <button class="btn-danger btn-big mt" onclick="resetAll()">Reset all data</button>
-    </div>`;
+    </div>
+    <p class="muted small center mb">5+2 Journeys · ${APP_VERSION}</p>`;
 }
 
 function newJourney() {
