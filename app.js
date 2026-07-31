@@ -793,7 +793,9 @@ function vHome() {
       <button class="btn-ghost btn-big mt" onclick="abandonSession()">Discard</button>
     </div>`;
   } else if (next) {
-    const type = dayType(j, next.dayIndex);
+    const planned = dayType(j, next.dayIndex);
+    const resc = legsRescueFor(j, next.week, next.dayIndex, planned);
+    const type = resc || planned;
     const slots = slotsFor(j, next.week, type);
     const detail = type === 'REST' ? '<p class="muted">Rest & recover — adaptation happens today.</p>'
       : type === 'SPRINT' ? '<p class="muted">2 warm-ups (30 s) + up to 6 sprints (20 s), with slope and speed logged.</p>'
@@ -801,6 +803,7 @@ function vHome() {
     html += `<div class="card highlight">
       <div class="row spread"><h3>Next up</h3>${dayBadge(type)}</div>
       <p class="big">Week ${next.week} · Day ${next.dayIndex + 1}</p>
+      ${resc ? `<p class="muted small">${dayLabel(resc)} was missed — it takes this slot. ${dayLabel(planned)} is skipped this week.</p>` : ''}
       ${detail}
       <button class="btn-primary mt" onclick="startSession(${next.week}, ${next.dayIndex})">Start</button>
       ${view.cant
@@ -831,9 +834,10 @@ function vHome() {
       const isDone = done.has(w + ':' + d);
       const miss = missedKind(j, w, d);
       const isNext = next && next.week === w && next.dayIndex === d;
+      const cellResc = !isDone && !miss ? legsRescueFor(j, w, d, dayType(j, d)) : null;
       const label = !isDone && miss
         ? (miss === 'sick' ? 'Sick' : 'No time')
-        : dayLabel((isDone && typeByDay[w + ':' + d]) || dayType(j, d)).replace(' ', '');
+        : dayLabel((isDone && typeByDay[w + ':' + d]) || cellResc || dayType(j, d)).replace(' ', '');
       days.push(`<div class="day ${isDone ? 'done' : ''} ${!isDone && miss ? miss : ''} ${isNext ? 'next' : ''}" onclick="startSession(${w},${d})">
         <span class="n">${d + 1}</span><span>${label}</span></div>`);
     }
