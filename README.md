@@ -14,7 +14,7 @@ A slot's rounds are deliberately unequal: an A-slot ramp runs light in rounds 1�
 
 ### Recommended day setups
 
-Program → Days offers a recommended five for each leg day, per block — the slots, what each one replaces, and why that order. Applying is always an explicit tap; nothing is auto-applied and past logs are never touched. The rule behind them: slot A runs five times a session, so it holds the exercise you can accumulate the most volume on, not the heaviest lift — the barbell anchor sits at B.
+Program → Days offers a recommended five for each leg and upper day, per block — the slots, what each one replaces, and why that order. Applying is always an explicit tap; nothing is auto-applied and past logs are never touched. The rule behind them: slot A runs five times a session, so it holds the exercise you can accumulate the most volume on, not the heaviest lift — the barbell anchor sits at B.
 
 Weeks 4–6 keep the same five roles and harden the variant. The anchor at B is the constrained slot: it may only move to a variant needing *less* absolute load for the same stimulus (box squat → paused box squat), never one that deepens the start or lengthens the range — which is why the trap bar does not change at all. The E slot rotates its anti-movement rather than hardening, so anti-extension, anti-lateral-flexion and anti-rotation are all covered across a journey.
 
