@@ -187,6 +187,36 @@ function lastLogged(exId) {
   return null;
 }
 
+/* Per-round memory: what this exercise did at THIS round number, most recently.
+   The accumulator means a slot's rounds are deliberately unequal — an A-slot
+   ramp (light rounds 1-2, working weight 3-5) or a reverse pyramid on a B-slot
+   anchor (round 1 ~80%, round 2 top, then back down). Carrying the previous
+   set forward gets every one of those rounds wrong; round 2 would prefill from
+   round 1's ramp weight, and next session's round 1 would prefill from last
+   session's lightest back-off set. Matching round to round reproduces the
+   shape instead of flattening it. */
+function lastLoggedAtRound(exId, round) {
+  for (let i = S.sessions.length - 1; i >= 0; i--) {
+    const hit = (S.sessions[i].sets || []).find((x) => x.ex === exId && x.round === round);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/* Did a heavier round of this exercise exist last time it was trained? Used to
+   put the +kg suggestion on the top set only — on a reverse pyramid that is
+   round 2, not round 1. */
+function hasHeavierRound(exId, round) {
+  for (let i = S.sessions.length - 1; i >= 0; i--) {
+    const sets = (S.sessions[i].sets || []).filter((x) => x.ex === exId);
+    if (!sets.length) continue;
+    const here = sets.find((x) => x.round === round);
+    if (!here) return false;
+    return sets.some((x) => (x.weight || 0) > (here.weight || 0));
+  }
+  return false;
+}
+
 function bucketFloor(bucket) {
   if (!bucket) return 30; // secs default
   return parseInt(bucket, 10) || 10;
@@ -382,16 +412,23 @@ function initRound() {
   const c = S.current;
   const slots = (c.slots || []).slice(0, c.round);
   c.roundEntries = slots.map((exId) => {
-    // prefill: latest set this session, else history, else bucket floor / 0 kg
+    // prefill, in order: this round last time (keeps a ramp or reverse pyramid
+    // intact), else the latest set this session, else any history, else the
+    // bucket floor at 0 kg
+    const atRound = lastLoggedAtRound(exId, c.round);
     const inSession = c.sets.slice().reverse().find((s) => s.ex === exId);
-    const prev = inSession || lastLogged(exId);
+    const prev = atRound || inSession || lastLogged(exId);
     const e = ex(exId);
-    const sug = (!inSession && prev) ? progressionSuggestion(exId) : null;
+    // the progression bump belongs on the top-weight round only; offering it on
+    // a ramp or back-off round would walk the whole shape up together
+    const isTopRound = atRound ? !hasHeavierRound(exId, c.round) : !inSession;
+    const sug = (prev && isTopRound) ? progressionSuggestion(exId) : null;
     return {
       ex: exId,
       amount: prev ? prev.amount : bucketFloor(e.bucket),
       weight: sug ? sug.from + sug.add : (prev ? prev.weight : 0),
       fresh: !prev,
+      shaped: !!atRound,
       skipped: false,
       info: false,
       sugg: sug,
@@ -914,6 +951,7 @@ function vWorkout() {
           : '↑ +' + en.sugg.add + ' kg suggested · tap to apply'}</button>` : ''}
         ${en.info ? `<p class="muted small how-to">${esc(e.desc || e.cue || 'No description yet.')}</p>` : ''}
         ${en.fresh && en.weight === 0 && isReps && !S.settings.travelMode ? `<p class="muted small fresh-hint">First time: think of your max weight, then go ~25% lighter.</p>` : ''}
+        ${en.shaped && !en.skipped && !en.fresh ? `<p class="muted small">Round ${c.round} last time.</p>` : ''}
         <div class="set-row">
           ${stepperHTML(i, 'amount', en.amount, isReps ? 'reps' : 'secs', isReps ? -1 : -5, isReps ? 1 : 5)}
           ${S.settings.travelMode
@@ -1375,6 +1413,7 @@ function programDaysHTML(j) {
     </div>
     ${editHTML}
     <div class="card">${slotRows || '<p class="muted">No exercises configured for this day.</p>'}</div>
+    ${recommendedHTML(j, slots)}
     <div class="card">
       <h3>Week layout</h3>
       <label class="field" for="restDaySel">Rest day position</label>
@@ -1394,6 +1433,55 @@ function programDaysHTML(j) {
       <select id="newExBucket"><option value="">none (time-based)</option>${BUCKETS.map((b) => `<option ${b === '9-12' ? 'selected' : ''}>${b}</option>`).join('')}</select>
       <button class="btn-big mt" onclick="addExercise()">Add</button>
     </div>`;
+}
+
+/* Recommended setup for the selected day: what it would become, what changes,
+   and why. Applying is always an explicit tap — nothing here is automatic. */
+function recommendedHTML(j, slots) {
+  const rec = (typeof RECOMMENDED_BLOCKS !== 'undefined') && RECOMMENDED_BLOCKS[view.day];
+  if (!rec) return '';
+  const missing = rec.slots.filter((id) => !S.exercises[id]);
+  const applied = JSON.stringify(slots) === JSON.stringify(rec.slots);
+  const blockLabel = view.block === 'early' ? 'Weeks 1–3' : 'Weeks 4–6';
+
+  const rows = rec.slots.map((id, i) => {
+    const e = ex(id);
+    const same = slots[i] === id;
+    return `<div class="set-row">
+      <div class="row exhead">
+        <span class="pattern-ico">${patternIcon(e.pattern, 30)}</span>
+        <div><b>${'ABCDE'[i]}</b> · ${esc(e.name)}<br>
+          <span class="muted small">${same ? 'unchanged' : 'replaces ' + esc(slots[i] ? ex(slots[i]).name : '—')}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div class="card${applied ? '' : ' highlight'}">
+    <h3>Recommended · ${esc(rec.title)}</h3>
+    ${applied
+      ? `<p class="muted small">${blockLabel} already match this setup.</p>`
+      : `<p class="muted small">Anchor at B, not A — slot A is five rounds a session, so it holds the lift you can accumulate volume on.</p>`}
+    ${rows}
+    ${missing.length
+      ? `<p class="muted small mt">Cannot apply — missing from the library: ${missing.map(esc).join(', ')}.</p>`
+      : applied ? ''
+        : `<button class="btn-big mt" onclick="applyRecommended()">Apply to ${blockLabel}</button>`}
+    <details class="mt"><summary class="muted small">Why this order</summary>
+      ${rec.why.map((w) => `<p class="muted small">${esc(w)}</p>`).join('')}
+    </details>
+  </div>`;
+}
+
+function applyRecommended() {
+  const j = journey();
+  const rec = (typeof RECOMMENDED_BLOCKS !== 'undefined') && RECOMMENDED_BLOCKS[view.day];
+  if (!j || !rec || !j.blocks[view.block]) return;
+  if (rec.slots.some((id) => !S.exercises[id])) return;
+  const blockLabel = view.block === 'early' ? 'Weeks 1–3' : 'Weeks 4–6';
+  if (!confirm(`Replace ${dayLabel(view.day)} (${blockLabel}) with the recommended setup? Past logs stay untouched.`)) return;
+  j.blocks[view.block][view.day] = rec.slots.slice();
+  view.editSlot = null;
+  save(); render();
 }
 
 function programLibraryHTML() {
