@@ -278,7 +278,7 @@ const SEED_EXERCISES = [
     desc: 'Feet shoulder-width, no weight needed. Sit into a half squat for two seconds, arms swung back, then jump straight up as high as you can with the arms driving. Land softly back in the half squat, heels touching down quietly. Pause and fully reset before the next rep: every jump starts from a dead stop, never from a bounce.' },
   { id: 'weighted_glute_kickback', name: 'Glute kickback (weighted)', group: 'legs', measure: 'reps', bucket: '13-16', pattern: 'bridge',
     cue: 'Heel to ceiling, squeeze two seconds',
-    desc: 'On all fours, a dumbbell folded into the crease behind one knee, or a band around the foot. Keep the knee bent at 90\u00b0 and drive the heel toward the ceiling in two seconds, until the thigh lines up with the torso and no higher; past that, the lower back takes over. Squeeze the glute hard for two seconds at the top, then lower in three seconds without the knee touching down. All reps on one side, then switch. The back stays flat; only the hip moves.' },  { id: 'sprawl', name: 'Sprawl', group: 'mixed', measure: 'reps', bucket: '13-16', pattern: 'jump',
+    desc: 'On all fours, a dumbbell folded into the crease behind one knee, or a band around the foot. Keep the knee bent at 90\u00b0 and drive the heel toward the ceiling in two seconds, until the thigh lines up with the torso and no higher; past that, the lower back takes over. Squeeze the glute hard for two seconds at the top, then lower in three seconds without the knee touching down. All reps on one side, then switch. The back stays flat; only the hip moves.' },  { id: 'sprawl', name: 'Sprawl', group: 'mixed', measure: 'reps', bucket: '13-16', pattern: 'core',
     cue: 'Burpee without push-up or jump',
     desc: 'The fast burpee: hands down, shoot the legs back to a plank, snap them back in, stand tall. No push-up and no jump; that is exactly what keeps the pace high. The chest stays over the hands.' },
   { id: 'box_jump_over', name: 'Box jump-over', group: 'mixed', measure: 'reps', bucket: '9-12', pattern: 'jump',
@@ -417,6 +417,15 @@ const WEEK_PLAN = ['LEGS1', 'UPPER1', 'MIXED1', 'LEGS2', 'UPPER2', 'SPRINT', 'RE
    parallel, and load-only progression. Slot D is the scapular slot on both
    upper days — it exists because of the weak link, not for variety.
 
+   The mixed day is where the two constraints meet, so it is the strictest.
+   Power is worth keeping — it declines faster than strength after 50 — but it
+   has to be expressed without spinal shear or an overhead lockout. That rules
+   out the whole snatch/thruster/clean-and-press family (a hinge from the floor
+   plus an overhead finish, ballistic, under fatigue) and the ballistic loaded
+   hinge. It leaves jumps that STEP DOWN rather than land, closed-chain
+   upper-body work, and carries. Note the cardio bursts already cover heavy bag
+   and battle ropes, so the slots do not need to duplicate that.
+
    Weeks 4-6 keep the same five slots and the same roles — only the variant
    hardens. The anchor at B is the constrained one: it may change variant ONLY
    where the new version needs LESS absolute load for the same stimulus (a
@@ -494,6 +503,29 @@ const RECOMMENDED_BLOCKS = {
         'C · Single-arm row for more range than the chest-supported version.',
         'D · Shoulder matrix pairs a lateral with a front raise, so weeks 4-6 add front-delt volume on top of the medial work.',
         'E · Plank to pike: shoulder-friendly dynamic core, no hanging.',
+      ],
+    },
+  },
+  MIXED1: {
+    title: 'Power & work capacity',
+    early: {
+      slots: ['box_jump', 'renegade_row', 'sprawl', 'farmers_carry', 'bear_crawl'],
+      why: [
+        'A · Box jump is the one plyometric that trains power without the landing. You jump up and STEP down, so there is no eccentric drop through a long spine and a 50-year-old Achilles. Box height is the dial. Power is the quality that fades fastest after 50, so it earns the volume slot.',
+        'B · Renegade row is the anchor: a pull, an anti-rotation core exercise and closed-chain serratus work in one, with no overhead position and no loaded spinal flexion. It puts pull volume on a third day, which the week was short of.',
+        'C · Sprawl is the burpee with the push-up and the jump taken out — full-body conditioning that keeps the shoulder out of end range.',
+        'D · Farmer carry: grip and trunk under a neutral, self-braced spine.',
+        'E · Bear crawl — closed-chain, serratus-loaded, and no spinal flexion anywhere in it.',
+      ],
+    },
+    late: {
+      slots: ['box_jump_over', 'renegade_row', 'plyo_push_up', 'suitcase_carry', 'plank_to_pike'],
+      why: [
+        'A · Box jump-over adds work without adding impact — you still step down off the far side rather than landing from height. The progression is volume and box height, never a floor landing.',
+        'B · Unchanged; the anchor progresses by dumbbell weight.',
+        'C · Plyo push-up is upper-body power with no overhead position and no hang, closed-chain so the scapula is loaded in its protective range. Deliberately held back to weeks 4-6: by then the push-up plus on UPPER2 has banked three weeks of serratus work before you start catching bodyweight on your hands. Start with hands on a bench.',
+        'D · Suitcase carry adds the anti-lateral-flexion demand the two-handed carry does not have.',
+        'E · Plank to pike: dynamic core that never loads a flexing spine.',
       ],
     },
   },
