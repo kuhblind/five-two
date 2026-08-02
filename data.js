@@ -392,6 +392,73 @@ const SEED_BLOCKS = {
 
 const WEEK_PLAN = ['LEGS1', 'UPPER1', 'MIXED1', 'LEGS2', 'UPPER2', 'SPRINT', 'REST'];
 
+/* Recommended day templates — offered in Program → Days, never auto-applied.
+   The rule behind them: slot A runs five times a session, so it holds the
+   exercise you can accumulate the most volume on, NOT the heaviest lift. For a
+   long-levered lifter protecting the lower back that means unilateral work at A
+   and the barbell anchor at B (four rounds instead of five). Slot C fills the
+   gap the anchor leaves; D and E are anti-movement core rather than any loaded
+   flexion or rotation.
+
+   Weeks 4-6 keep the same five slots and the same roles — only the variant
+   hardens. The anchor at B is the constrained one: it may change variant ONLY
+   where the new version needs LESS absolute load for the same stimulus (a
+   paused box squat costs momentum, not spine), never where it deepens the
+   start position or lengthens the range. That is why the box squat gains a
+   pause and the trap bar does not move at all — a deficit pull would drop the
+   start height, which is the one thing a long-levered lifter cannot afford.
+   The E slot rotates its anti-movement instead of hardening, so
+   anti-extension, anti-lateral-flexion and anti-rotation all get covered
+   across a journey. */
+const RECOMMENDED_BLOCKS = {
+  LEGS1: {
+    title: 'Squat-dominant',
+    early: {
+      slots: ['bulgarian_split_squat', 'box_squat', 'hip_thrust', 'suitcase_carry', 'dead_bug'],
+      why: [
+        'A · Unilateral work carries the volume — about half the axial spinal load of a bilateral squat for the same per-leg stimulus.',
+        'B · Box squat is the anchor, four rounds not five. Do it first in the session while you are fresh; the slot number is a set count, not an order.',
+        'C · Hip thrust loads the glutes with the spine horizontal and neutral — no hinge under a long lever.',
+        'D · Suitcase carry is anti-lateral-flexion plus grip. It sits on this day because the grip is fresh here.',
+        'E · Dead bug for anti-extension. One round is a real dose in the descending-hold format.',
+      ],
+    },
+    late: {
+      slots: ['bulgarian_split_squat', 'paused_box_squat', 'single_leg_hip_thrust', 'suitcase_carry', 'pallof_press'],
+      why: [
+        'A · Unchanged — the split squat is already the hardest unilateral squat in the library, so weeks 4-6 progress it by load, not by variant.',
+        'B · Paused box squat: a full two-second sit deletes momentum, so the same bar speed costs less weight. Strength without a heavier spine.',
+        'C · Single-leg hip thrust — same horizontal spine, one leg at a time, and the hips now have to fight staying level.',
+        'D · Unchanged. A carry progresses by weight and distance; there is no harder version to swap to.',
+        'E · Pallof press rotates the core slot to anti-rotation, so the journey covers all three anti-movements rather than repeating one.',
+      ],
+    },
+  },
+  LEGS2: {
+    title: 'Hinge-dominant',
+    early: {
+      slots: ['reverse_lunge', 'trap_bar_deadlift', 'slider_leg_curl', 'side_plank', 'bird_dog'],
+      why: [
+        'A · Reverse lunge carries the volume; less knee-punishing than a forward lunge and distinct from the split squat, so the two leg days do not collapse into one.',
+        'B · Trap bar is the anchor, four rounds. Use the high handles or blocks — start height is the constraint, not strength.',
+        'C · Slider leg curl: knee-flexion hamstring work, the function neither the squat nor the deadlift trains. No hinge, which is what you want after the trap bar.',
+        'D · Side plank for anti-lateral-flexion at low spinal compression.',
+        'E · Bird dog for anti-rotation — the reflexive bracing that holds position under the bar.',
+      ],
+    },
+    late: {
+      slots: ['deficit_reverse_lunge', 'trap_bar_deadlift', 'nordic_curl', 'side_plank', 'mcgill_curl_up'],
+      why: [
+        'A · Deficit reverse lunge: front foot on a low plate for more depth and a bigger glute stretch, with the torso still vertical.',
+        'B · Unchanged, deliberately. Every harder trap-bar variant lowers the start height, and start height is exactly what a long-levered lifter is protecting. This one progresses by load only.',
+        'C · Nordic curl is the top of the knee-flexion progression: highest hamstring activation of the common options, and the slider curl earns it.',
+        'D · Unchanged. Side plank progresses by hold time and lever, not by swapping.',
+        'E · McGill curl-up rotates the core slot to anti-extension, mirroring the LEGS1 rotation the other way.',
+      ],
+    },
+  },
+};
+
 function seedState() {
   const exercises = {};
   SEED_EXERCISES.forEach((e) => { exercises[e.id] = Object.assign({}, e); });
