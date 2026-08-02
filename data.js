@@ -153,7 +153,7 @@ const SEED_EXERCISES = [
   { id: 'incline_db_press', name: 'Incline DB press', group: 'upper', measure: 'reps', bucket: '9-12', pattern: 'push',
     cue: 'Bench ~30°, press up and slightly back',
     desc: 'Bench at about 30°. Lower the dumbbells for two seconds to the upper chest, elbows 45°, then press up and slightly back so they finish over the collarbones. Squeeze at the top without banging the weights together.' },
-  { id: 'push_up', name: 'Push-up', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'push',
+  { id: 'push_up', loadable: true, name: 'Push-up', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'push',
     cue: 'Elbows to 90°, neutral back',
     desc: 'Hands under the shoulders (on dumbbells for straight wrists and extra depth). Body one rigid line: glutes and belly squeezed. Lower the chest for two seconds to a fist-height above the floor, elbows about 45°, then push the floor away to straight arms. The hips never sag and never pike.' },
   { id: 'overhead_press', name: 'Overhead press', group: 'upper', measure: 'reps', bucket: '9-12', pattern: 'press',
@@ -400,6 +400,17 @@ const WEEK_PLAN = ['LEGS1', 'UPPER1', 'MIXED1', 'LEGS2', 'UPPER2', 'SPRINT', 'RE
    gap the anchor leaves; D and E are anti-movement core rather than any loaded
    flexion or rotation.
 
+   The upper days apply the same rule to a different joint. The limiter there is
+   scapular control, and a scapula that cannot hold position hands the work to
+   the elbow flexors on a long-head biceps tendon already under increased shear
+   — which is why vertical pulls hurt and horizontal ones do not. So A holds the
+   chest-supported row (no hang, no torso stabilising, no supinated grip) and
+   the anchor at B is the loaded push. Dips sit at B rather than A on purpose:
+   they load the SAME tendon as the pull-ups via anterior humeral translation in
+   deep shoulder extension, so they get four rounds, a depth cap at upper arms
+   parallel, and load-only progression. Slot D is the scapular slot on both
+   upper days — it exists because of the weak link, not for variety.
+
    Weeks 4-6 keep the same five slots and the same roles — only the variant
    hardens. The anchor at B is the constrained one: it may change variant ONLY
    where the new version needs LESS absolute load for the same stimulus (a
@@ -431,6 +442,52 @@ const RECOMMENDED_BLOCKS = {
         'C · Single-leg hip thrust — same horizontal spine, one leg at a time, and the hips now have to fight staying level.',
         'D · Unchanged. A carry progresses by weight and distance; there is no harder version to swap to.',
         'E · Pallof press rotates the core slot to anti-rotation, so the journey covers all three anti-movements rather than repeating one.',
+      ],
+    },
+  },
+  UPPER1: {
+    title: 'Pull-led',
+    early: {
+      slots: ['chest_supported_row', 'db_bench_press', 'single_arm_row', 'face_pull', 'pallof_press'],
+      why: [
+        'A · Chest-supported row is the loaded pull that removes every ingredient of pull-up biceps pain: no hang, no torso stabilising, no supinated grip. Safe at five rounds for exactly that reason.',
+        'B · DB bench press, not the barbell — a free hand path lets the shoulder rotate naturally, which is worth more than the extra kilos a fixed bar allows.',
+        'C · Single-arm row for a bigger range and a real stretch at the bottom; unilateral, so the weaker side cannot hide.',
+        'D · Face pull is direct mid- and lower-trap work. This slot exists because of the scapula; progress it by band tension.',
+        'E · Pallof press for anti-rotation.',
+      ],
+    },
+    late: {
+      slots: ['chest_supported_row', 'db_bench_press', 'renegade_row', 'chest_supported_y_raise', 'ab_rollout'],
+      why: [
+        'A · Unchanged. The pull that works progresses by load, not by variant.',
+        'B · Unchanged, same reasoning as A. On upper days the anchor constraint bites harder than on legs, so variety lives in C, D and E.',
+        'C · Renegade row moves the pull into a plank, loading the serratus anterior closed-chain — the muscle most implicated in scapular dyskinesis.',
+        'D · Y raise is more lower-trap specific than the face pull, and chest-supported so nothing is borrowed from the low back.',
+        'E · Ab rollout rotates the core slot to anti-extension.',
+      ],
+    },
+  },
+  UPPER2: {
+    title: 'Push-led · dips anchor',
+    early: {
+      slots: ['push_up', 'dips', 'chest_supported_row', 'face_pull', 'dead_bug'],
+      why: [
+        'A · The push-up is the one press where the scapula moves freely instead of being pinned to a bench, so the serratus anterior works through protraction. For a scapular problem that is a fix as well as a volume driver. Progress by elevating the feet, then adding weight.',
+        'B · Dips as the anchor — the loaded lift of the day. Depth to upper arms parallel and no further: deep shoulder extension drives the humeral head forward onto the same long-head biceps tendon that hurts on pull-ups.',
+        'C · Pull volume on the push day, so the week does not tilt anterior.',
+        'D · Face pull again. It is the highest-value accessory for this weak link and there is no reason to rotate away from it.',
+        'E · Dead bug for anti-extension.',
+      ],
+    },
+    late: {
+      slots: ['push_up', 'weighted_dip', 'single_arm_row', 'face_pull', 'plank_to_pike'],
+      why: [
+        'A · Unchanged; the progression is feet elevation and added weight, not a different movement.',
+        'B · Weighted dip. The anchor progresses by LOAD only — another two centimetres of depth is not progression, it is the risk variable.',
+        'C · Single-arm row for more range than the chest-supported version.',
+        'D · Unchanged, deliberately.',
+        'E · Plank to pike: shoulder-friendly dynamic core, no hanging.',
       ],
     },
   },
