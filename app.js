@@ -1438,7 +1438,7 @@ function programDaysHTML(j) {
 /* Recommended setup for the selected day: what it would become, what changes,
    and why. Applying is always an explicit tap — nothing here is automatic. */
 function recommendedHTML(j, slots) {
-  const rec = (typeof RECOMMENDED_BLOCKS !== 'undefined') && RECOMMENDED_BLOCKS[view.day];
+  const rec = recommendedFor(view.day, view.block);
   if (!rec) return '';
   const missing = rec.slots.filter((id) => !S.exercises[id]);
   const applied = JSON.stringify(slots) === JSON.stringify(rec.slots);
@@ -1457,7 +1457,7 @@ function recommendedHTML(j, slots) {
   }).join('');
 
   return `<div class="card${applied ? '' : ' highlight'}">
-    <h3>Recommended · ${esc(rec.title)}</h3>
+    <h3>Recommended · ${esc(rec.title)} · ${blockLabel}</h3>
     ${applied
       ? `<p class="muted small">${blockLabel} already match this setup.</p>`
       : `<p class="muted small">Anchor at B, not A — slot A is five rounds a session, so it holds the lift you can accumulate volume on.</p>`}
@@ -1472,9 +1472,18 @@ function recommendedHTML(j, slots) {
   </div>`;
 }
 
+/* The recommendation for a day is block-specific: weeks 4-6 harden the variant
+   in slots A/C/E while keeping the same five roles and the same anchor at B. */
+function recommendedFor(day, block) {
+  if (typeof RECOMMENDED_BLOCKS === 'undefined') return null;
+  const day_ = RECOMMENDED_BLOCKS[day];
+  const b = day_ && day_[block];
+  return b ? { title: day_.title, slots: b.slots, why: b.why } : null;
+}
+
 function applyRecommended() {
   const j = journey();
-  const rec = (typeof RECOMMENDED_BLOCKS !== 'undefined') && RECOMMENDED_BLOCKS[view.day];
+  const rec = recommendedFor(view.day, view.block);
   if (!j || !rec || !j.blocks[view.block]) return;
   if (rec.slots.some((id) => !S.exercises[id])) return;
   const blockLabel = view.block === 'early' ? 'Weeks 1–3' : 'Weeks 4–6';
