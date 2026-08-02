@@ -1,6 +1,6 @@
 /* app.js — 5+2 Journeys: views, accumulator engine, cardio timer, logging */
 // keep in sync with the CACHE name in sw.js
-const APP_VERSION = 'v32';
+const APP_VERSION = 'v33';
 
 let S = loadState() || normalizeState(seedState());
 saveState(S);
