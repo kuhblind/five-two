@@ -1,6 +1,6 @@
 /* app.js — 5+2 Journeys: views, accumulator engine, cardio timer, logging */
 // keep in sync with the CACHE name in sw.js
-const APP_VERSION = 'v35';
+const APP_VERSION = 'v36';
 
 let S = loadState() || normalizeState(seedState());
 saveState(S);
@@ -1684,7 +1684,24 @@ function vSettings() {
       <h3>Danger zone</h3>
       <button class="btn-danger btn-big mt" onclick="resetAll()">Reset all data</button>
     </div>
+    <div class="card">
+      <h3>App version</h3>
+      <p class="muted small">Running ${APP_VERSION}. Updates install in the background and apply when you next reopen the app.</p>
+      <button class="btn-big btn-ghost mt" onclick="manualUpdateCheck(this)">Check for updates now</button>
+    </div>
     <p class="muted small center mb">5+2 Journeys · ${APP_VERSION}</p>`;
+}
+
+/* forces the service-worker update check, then reloads so the new files are
+   the ones actually running (a claimed worker alone does not replace live JS) */
+function manualUpdateCheck(btn) {
+  if (btn) { btn.textContent = 'Checking…'; btn.disabled = true; }
+  const done = () => { location.reload(); };
+  if (typeof window.checkForUpdate === 'function') {
+    Promise.resolve(window.checkForUpdate()).then(() => setTimeout(done, 1200));
+  } else {
+    setTimeout(done, 300);
+  }
 }
 
 function newJourney() {

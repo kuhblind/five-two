@@ -23,8 +23,35 @@
 <script src="data.js"></script>
 <script src="app.js"></script>
 <script>
+/* Update pipeline. Three things have to happen or a home-screen PWA can sit on
+   an old build indefinitely:
+   1. updateViaCache 'none' — never answer the sw.js update check from cache
+   2. check on load AND every time the app comes back to the foreground; an iOS
+      PWA resumed from the background never fires 'load' again
+   3. reload when the new worker takes over — otherwise the page keeps running
+      the old JS in memory even though the new files are cached. Never mid-session. */
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+  let reloading = false;
+  const hadController = !!navigator.serviceWorker.controller;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading || !hadController) return;      // first install needs no reload
+    if (window.S && S.current) return;            // never interrupt a live session
+    reloading = true;
+    location.reload();
+  });
+
+  const check = () => navigator.serviceWorker.getRegistration()
+    .then((reg) => reg && reg.update())
+    .catch(() => {});
+
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') check();
+  });
+  window.checkForUpdate = check;
 }
 </script>
 </body>
