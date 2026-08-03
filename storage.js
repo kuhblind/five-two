@@ -300,11 +300,11 @@ function normalizeState(state) {
   // (it is rendered back into markup)
   Object.keys(state.exercises).forEach((id) => {
     const e = state.exercises[id];
-    ['snackReps', 'snackKg'].forEach((f) => {
+    ['snackRounds', 'snackReps', 'snackKg'].forEach((f) => {
       if (e[f] == null) return;
       const n = parseFloat(e[f]);
       if (!isFinite(n) || n < 0) { delete e[f]; return; }
-      e[f] = Math.min(n, f === 'snackKg' ? 500 : 999);
+      e[f] = Math.min(n, f === 'snackKg' ? 500 : (f === 'snackRounds' ? 20 : 999));
     });
     if (e.snackBand != null) e.snackBand = String(e.snackBand).slice(0, 24);
   });

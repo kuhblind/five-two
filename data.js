@@ -587,7 +587,7 @@ const SNACK_SESSIONS = {
     freq: '3×/week',
     minutes: 15,
     blurb: 'Serratus and lower trap — the route back to pull-ups and overhead pressing.',
-    intro: 'Do this fresh, not as a warm-up before pressing: you want the stabilisers rested when you teach them a pattern. Never before or on an upper day. Judge it at eight weeks — the markers are the ladder at active hang, a comfortable push-up plus, and a painless banded pull-up.',
+    intro: 'Do this fresh, never before or on an upper day. Judge it at eight weeks.',
     items: [
       { ex: 'prone_y_raise', target: '3 × 10–15' },
       { ex: 'wall_slide_band', target: '3 × 8–12' },
@@ -604,7 +604,7 @@ const SNACK_SESSIONS = {
     freq: '2×/week',
     minutes: 12,
     blurb: 'Delts, calves, arms and rear delts — the volume the pyramid cannot hold.',
-    intro: 'Run it as a circuit: unrelated muscle groups, so no rest between exercises. Light loads work here, but only if the last set of each goes close to failure — light sets stopped short do very little. Best appended to a leg day.',
+    intro: 'Run as a circuit, no rest between exercises. Light loads are fine, but take the last round close to failure.',
     items: [
       { ex: 'lateral_raise', target: '4 × 12–20' },
       { ex: 'calf_raise', target: '4 × 10–15 · standing' },

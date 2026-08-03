@@ -1,6 +1,6 @@
 /* app.js — 5+2 Journeys: views, accumulator engine, cardio timer, logging */
 // keep in sync with the CACHE name in sw.js
-const APP_VERSION = 'v34';
+const APP_VERSION = 'v35';
 
 let S = loadState() || normalizeState(seedState());
 saveState(S);
@@ -109,11 +109,11 @@ function bigThreeWeekCount() {
    user-owned fields on the exercise record (same doctrine as bucket). */
 function setSnackField(exId, field, value) {
   const e = S.exercises[exId];
-  if (!e || !['snackReps', 'snackKg', 'snackBand'].includes(field)) return;
+  if (!e || !['snackRounds', 'snackReps', 'snackKg', 'snackBand'].includes(field)) return;
   if (field === 'snackBand') {
     e.snackBand = String(value || '').slice(0, 24);
   } else {
-    const max = field === 'snackKg' ? 500 : 999;
+    const max = field === 'snackKg' ? 500 : (field === 'snackRounds' ? 20 : 999);
     e[field] = clampNum(value, 0, max, 0);
   }
   save(); render();
@@ -132,6 +132,12 @@ function snackStepperHTML(exId, field, value, unit, step) {
     <button onclick="adjustSnackField('${exId}', '${field}', ${step})" aria-label="more ${unit}">+</button>
     <span class="unit">${unit}</span>
   </div>`;
+}
+
+function toggleSnackInfo(exId) {
+  if (!view.info) view.info = {};
+  view.info[exId] = !view.info[exId];
+  render();
 }
 
 function setBucket(exId, bucket) {
@@ -843,16 +849,21 @@ function vSnack() {
   const rows = sn.items.map((it, i) => {
     const e = ex(it.ex);
     const isReps = e.measure !== 'secs';
+    const open = !!(view.info || {})[it.ex];
     return `<div class="card">
-      <div class="row exhead">
-        <span class="pattern-ico">${patternIcon(e.pattern, 34)}</span>
-        <div class="grow">
-          <div class="exname">${i + 1} · ${esc(e.name)}</div>
-          <div class="target">${esc(it.target)}</div>
+      <div class="row spread">
+        <div class="row exhead grow">
+          <span class="pattern-ico">${patternIcon(e.pattern, 34)}</span>
+          <div class="grow">
+            <div class="exname">${i + 1} · ${esc(e.name)}</div>
+            <div class="target">${esc(it.target)}</div>
+          </div>
         </div>
+        <button class="btn-small btn-ghost" onclick="toggleSnackInfo('${it.ex}')" aria-label="how to do this exercise">?</button>
       </div>
-      <p class="muted small how-to">${esc(e.desc || e.cue || '')}</p>
+      ${open ? `<p class="muted small how-to">${esc(e.desc || e.cue || '')}</p>` : ''}
       <div class="row wrap mt" style="gap:0.6rem">
+        ${snackStepperHTML(it.ex, 'snackRounds', e.snackRounds || 0, 'rounds', 1)}
         ${snackStepperHTML(it.ex, 'snackReps', e.snackReps || 0, isReps ? 'reps' : 'secs', 1)}
         ${snackStepperHTML(it.ex, 'snackKg', e.snackKg || 0, 'kg', S.settings.weightStep)}
       </div>
