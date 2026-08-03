@@ -293,8 +293,21 @@ function normalizeState(state) {
       cur.pattern = e.pattern; cur.cue = e.cue; cur.desc = e.desc;
       cur.travel = e.travel || false;
       cur.loadable = e.loadable || false;
+      cur.snack = e.snack || false;
     });
   }
+  // snack-session memory is user-owned free input: clamp numbers, cap the text
+  // (it is rendered back into markup)
+  Object.keys(state.exercises).forEach((id) => {
+    const e = state.exercises[id];
+    ['snackReps', 'snackKg'].forEach((f) => {
+      if (e[f] == null) return;
+      const n = parseFloat(e[f]);
+      if (!isFinite(n) || n < 0) { delete e[f]; return; }
+      e[f] = Math.min(n, f === 'snackKg' ? 500 : 999);
+    });
+    if (e.snackBand != null) e.snackBand = String(e.snackBand).slice(0, 24);
+  });
   // missed-day marks: '<journeyId>:<week>:<dayIndex>' -> 'sick' | 'blocked'
   if (!state.missed || typeof state.missed !== 'object' || Array.isArray(state.missed)) state.missed = {};
   Object.keys(state.missed).forEach((k) => {

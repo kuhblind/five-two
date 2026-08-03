@@ -1,6 +1,6 @@
 /* app.js — 5+2 Journeys: views, accumulator engine, cardio timer, logging */
 // keep in sync with the CACHE name in sw.js
-const APP_VERSION = 'v33';
+const APP_VERSION = 'v34';
 
 let S = loadState() || normalizeState(seedState());
 saveState(S);
@@ -103,6 +103,35 @@ function bigThreeWeekCount() {
     if (S.bigThree[localDate(new Date(Date.now() - i * 86400000))]) n++;
   }
   return n;
+}
+
+/* snack sessions: reference + memory, never logged. reps/kg/band are
+   user-owned fields on the exercise record (same doctrine as bucket). */
+function setSnackField(exId, field, value) {
+  const e = S.exercises[exId];
+  if (!e || !['snackReps', 'snackKg', 'snackBand'].includes(field)) return;
+  if (field === 'snackBand') {
+    e.snackBand = String(value || '').slice(0, 24);
+  } else {
+    const max = field === 'snackKg' ? 500 : 999;
+    e[field] = clampNum(value, 0, max, 0);
+  }
+  save(); render();
+}
+
+function adjustSnackField(exId, field, delta) {
+  const e = S.exercises[exId];
+  if (!e) return;
+  setSnackField(exId, field, (Number(e[field]) || 0) + delta);
+}
+
+function snackStepperHTML(exId, field, value, unit, step) {
+  return `<div class="stepper">
+    <button onclick="adjustSnackField('${exId}', '${field}', ${-step})" aria-label="less ${unit}">−</button>
+    <input class="val" inputmode="decimal" value="${value}" onchange="setSnackField('${exId}', '${field}', this.value)" aria-label="${unit}">
+    <button onclick="adjustSnackField('${exId}', '${field}', ${step})" aria-label="more ${unit}">+</button>
+    <span class="unit">${unit}</span>
+  </div>`;
 }
 
 function setBucket(exId, bucket) {
@@ -382,6 +411,7 @@ function sorenessSwap(slots) {
     Object.values(S.exercises).forEach((e) => {
       if (e.group !== group || out.includes(e.id)) return;
       if (e.travel && !S.settings.travelMode) return;
+      if (e.snack) return; // snack-session moves are never logged -> would always look 'stalest'
       const ts = tsOf(e.id);
       if (ts < bestTs) { best = e.id; bestTs = ts; }
     });
@@ -707,7 +737,7 @@ function render() {
     const views = {
       home: vHome, workout: vWorkout, sprint: vSprint, rest: vRest,
       summary: vSummary, journal: vJournal, session: vSession, progress: vProgress,
-      program: vProgram, settings: vSettings,
+      program: vProgram, settings: vSettings, snack: vSnack,
       activation: () => vReading('Activation', ACTIVATION_IDEAS,
         'Ten minutes before the first exercise. Lower-body days: bike 5 min → cat-cow ×8 → glute bridge ×15 → band side-steps ×15 → ankle rockers ×10 per side → ramp sets. Upper days: swap in arm circles and band pull-aparts. Then check in: sleep, niggles, energy.',
         ACTIVATION_STRETCHES),
@@ -792,6 +822,54 @@ function travelCardHTML() {
   </div>`;
 }
 
+function snackCardHTML(key) {
+  const sn = SNACK_SESSIONS[key];
+  if (!sn) return '';
+  return `<div class="card snack-card" onclick="go('snack', { key: '${key}' })">
+    <div class="row spread">
+      <div class="grow">
+        <h3>${esc(sn.name)}</h3>
+        <p class="muted small">${esc(sn.blurb)}</p>
+        <p class="muted small accent">${sn.items.length} moves · ~${sn.minutes} min · ${esc(sn.freq)}</p>
+      </div>
+      <span class="chev muted">›</span>
+    </div>
+  </div>`;
+}
+
+function vSnack() {
+  const sn = SNACK_SESSIONS[view.key];
+  if (!sn) { go('home'); return ''; }
+  const rows = sn.items.map((it, i) => {
+    const e = ex(it.ex);
+    const isReps = e.measure !== 'secs';
+    return `<div class="card">
+      <div class="row exhead">
+        <span class="pattern-ico">${patternIcon(e.pattern, 34)}</span>
+        <div class="grow">
+          <div class="exname">${i + 1} · ${esc(e.name)}</div>
+          <div class="target">${esc(it.target)}</div>
+        </div>
+      </div>
+      <p class="muted small how-to">${esc(e.desc || e.cue || '')}</p>
+      <div class="row wrap mt" style="gap:0.6rem">
+        ${snackStepperHTML(it.ex, 'snackReps', e.snackReps || 0, isReps ? 'reps' : 'secs', 1)}
+        ${snackStepperHTML(it.ex, 'snackKg', e.snackKg || 0, 'kg', S.settings.weightStep)}
+      </div>
+      <label class="field" for="band_${it.ex}">Band / note</label>
+      <input type="text" id="band_${it.ex}" class="band-input" inputmode="text" maxlength="24"
+        placeholder="e.g. red, light loop"
+        value="${esc(e.snackBand || '')}"
+        onchange="setSnackField('${it.ex}', 'snackBand', this.value)">
+    </div>`;
+  }).join('');
+  return `<div class="topbar"><button onclick="go('home')" aria-label="back">←</button>
+      <span class="title">${esc(sn.name)}</span><span class="muted small">${esc(sn.freq)}</span></div>
+    <div class="card highlight"><p class="muted">${esc(sn.intro)}</p></div>
+    ${rows}
+    <p class="muted small center mb">Not logged to the journal — these numbers are your memory only.</p>`;
+}
+
 function zone2CardHTML(week) {
   const j = journey();
   const key = j.id + ':' + week;
@@ -856,6 +934,8 @@ function vHome() {
     </div>`;
     html += bigThreeCardHTML();
     html += zone2CardHTML(next.week);
+    html += snackCardHTML('scapula');
+    html += snackCardHTML('volume');
     html += travelCardHTML();
   } else {
     html += `<div class="card highlight"><h3>Journey complete</h3>

@@ -234,6 +234,12 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .week-grid .day.blocked { background: linear-gradient(180deg, #f09a3e, #d1761a); border-color: transparent; }
 .week-grid .day.blocked, .week-grid .day.blocked .n { color: #2b1403; }
 
+/* snack sessions */
+.snack-card { cursor: pointer; }
+.snack-card:active { border-color: var(--accent); }
+.snack-card .chev { font-size: 1.6rem; line-height: 1; flex-shrink: 0; }
+.band-input { margin-top: 0.15rem; }
+
 .miss-sick { color: #ff9d99; border-color: rgba(224, 87, 82, 0.5); background: rgba(224, 87, 82, 0.12); }
 .miss-blocked { color: #ffc07d; border-color: rgba(240, 154, 62, 0.5); background: rgba(240, 154, 62, 0.12); }
 

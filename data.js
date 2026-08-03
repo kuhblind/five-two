@@ -245,6 +245,30 @@ const SEED_EXERCISES = [
   { id: 'devil_press', name: 'Devil press', group: 'mixed', measure: 'reps', bucket: '9-12', pattern: 'jump',
     cue: 'Burpee + double-DB snatch',
     desc: 'Two dumbbells. Burpee down with the hands on the bells, chest to the floor, jump the feet back in, then swing both dumbbells between the legs and up overhead in one motion. Finish locked out and tall. Brutal by design; pick a pace you can hold for the whole set.' },
+  { id: 'prone_y_raise', name: 'Prone Y raise (Blackburn)', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'raise', snack: true,
+    cue: 'Face down, thumbs up, arms to a Y',
+    desc: 'Face down on the floor or a bench, forehead resting, arms hanging with the thumbs pointing up. Lift both arms up and out into a Y, in line with the ears, taking two seconds. Hold one second at the top: the squeeze belongs low between the shoulder blades. Lower in three seconds. Start with no weight at all; 1 to 2 kg is plenty later. If the shoulders rise toward the ears, the weight is too heavy.' },
+  { id: 'wall_slide_band', name: 'Wall slide (band)', group: 'upper', measure: 'reps', bucket: '9-12', pattern: 'press', snack: true,
+    cue: 'Forearms on the wall, push out, slide up',
+    desc: 'Stand facing a wall, forearms flat on it, a light loop band around both wrists. Press the forearms into the wall and out against the band, and keep pressing throughout. Slide the arms slowly up the wall over three seconds as far as they go without the shoulders shrugging, then lower over three seconds. The push into the wall is the serratus working. If the shoulders climb toward the ears, stop the slide lower.' },
+  { id: 'serratus_punch_band', name: 'Serratus punch (band)', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'push', snack: true,
+    cue: 'Band behind the back, punch and reach',
+    desc: 'Band anchored behind you at chest height, or looped around the upper back, arms straight out in front. Without bending the elbows, punch forward by pushing the shoulder blades apart and reaching the knuckles away from you. Hold the end position two seconds, then let the blades slide back together over three seconds. Only the shoulder blades move; the elbows stay locked and the torso stays still. If you find yourself leaning back or bending the arms to get more range, the band is too strong.' },
+  { id: 'band_external_rotation', name: 'Band external rotation', group: 'upper', measure: 'reps', bucket: '13-16', pattern: 'band', snack: true,
+    cue: 'Elbow pinned at the side, rotate out',
+    desc: 'Band anchored at elbow height, standing side-on, working arm nearest the anchor. Tuck a towel between the elbow and the ribs and keep it there. Rotate the forearm outward over two seconds until it points straight ahead, squeeze one second, then return over three seconds. The elbow never leaves the side and the torso never twists. Light band; this is a cuff drill, not a strength lift.' },
+  { id: 'banded_scaption', name: 'Banded scaption', group: 'upper', measure: 'reps', bucket: '9-12', pattern: 'raise', snack: true,
+    cue: 'Thumbs up, raise at 30 degrees, go high',
+    desc: 'Stand on a light band, arms at the sides, thumbs up. Raise both arms about thirty degrees forward of straight out to the side, taking three seconds, up past shoulder height toward overhead as far as it stays comfortable. Pause one second, lower over three seconds. This is the earn-it-back drill for the overhead range: add height and band tension only while it stays painless. Stop the raise below any point that pinches, and never speed up to force the last few reps.' },
+  { id: 'straight_arm_band_pulldown', name: 'Straight-arm band pulldown', group: 'upper', measure: 'reps', bucket: '17-20+', pattern: 'pull', snack: true,
+    cue: 'Arms straight overhead, pull to the thighs',
+    desc: 'Band anchored high, standing tall, arms straight overhead holding the band. Keeping the elbows completely straight, pull the hands down in an arc to the thighs over two seconds. Squeeze hard for two seconds at the bottom, where the lat pulls the shoulder down and back. Return overhead slowly over three seconds. The elbows never bend, which is the whole point: the biceps cannot help.' },
+  { id: 'supported_scap_shrug', name: 'Supported scapular shrug', group: 'upper', measure: 'reps', bucket: '9-12', pattern: 'pull', snack: true,
+    cue: 'Hang with feet down, pull the shoulders away from the ears',
+    desc: 'Hold the pull-up bar with the feet on the floor or a box, taking as much of your weight as you need. Let the shoulders rise toward the ears, then without bending the elbows pull them back down and the chest slightly up, taking two seconds. Hold one second, feeling it between the shoulder blades and never in the neck. Lower over three seconds. Progress by letting the feet carry less weight, not by adding load.' },
+  { id: 'active_hang', name: 'Active hang', group: 'upper', measure: 'secs', bucket: null, pattern: 'hold', snack: true,
+    cue: 'Feet off, shoulders pulled down the whole time',
+    desc: 'Hang from the bar with the feet off the floor and the arms straight, then pull the shoulders down away from the ears and hold them there for the whole set. The body should feel carried by the back, not dangling from the joints. Stop the set the moment the shoulders creep back up toward the ears or anything pinches. Build toward three sets of fifteen to twenty seconds before adding a band-assisted pull-up.' },
   { id: 'burpee', name: 'Burpee', group: 'mixed', measure: 'reps', bucket: '9-12', pattern: 'jump',
     cue: 'Chest to floor, jump at top',
     desc: 'Hands to the floor, jump or step the feet back, chest touches the floor. Push up fast, jump the feet back in under the hips, then stand and finish with a small jump and the hips fully open at the top. A smooth, quick rhythm beats frantic speed.' },
@@ -551,6 +575,42 @@ const RECOMMENDED_BLOCKS = {
         'E · McGill curl-up rotates the core slot to anti-extension, mirroring the LEGS1 rotation the other way.',
       ],
     },
+  },
+};
+
+/* Exercise snacks — brief supplementary sessions from the Aug-2026 memo.
+   Reference + memory only: never logged to the journal (adherence is tracked
+   elsewhere). `target` is the prescription; reps/kg/band are user-owned. */
+const SNACK_SESSIONS = {
+  scapula: {
+    name: 'Scapula',
+    freq: '3×/week',
+    minutes: 15,
+    blurb: 'Serratus and lower trap — the route back to pull-ups and overhead pressing.',
+    intro: 'Do this fresh, not as a warm-up before pressing: you want the stabilisers rested when you teach them a pattern. Never before or on an upper day. Judge it at eight weeks — the markers are the ladder at active hang, a comfortable push-up plus, and a painless banded pull-up.',
+    items: [
+      { ex: 'prone_y_raise', target: '3 × 10–15' },
+      { ex: 'wall_slide_band', target: '3 × 8–12' },
+      { ex: 'serratus_punch_band', target: '3 × 12–15' },
+      { ex: 'band_external_rotation', target: '2 × 12–15' },
+      { ex: 'banded_scaption', target: '2 × 10–12' },
+      { ex: 'straight_arm_band_pulldown', target: '3 × 12–20' },
+      { ex: 'supported_scap_shrug', target: '3 × 10–12 · ladder step 1–2' },
+      { ex: 'active_hang', target: '3 × 15–20 s · ladder step 3' },
+    ],
+  },
+  volume: {
+    name: 'Volume',
+    freq: '2×/week',
+    minutes: 12,
+    blurb: 'Delts, calves, arms and rear delts — the volume the pyramid cannot hold.',
+    intro: 'Run it as a circuit: unrelated muscle groups, so no rest between exercises. Light loads work here, but only if the last set of each goes close to failure — light sets stopped short do very little. Best appended to a leg day.',
+    items: [
+      { ex: 'lateral_raise', target: '4 × 12–20' },
+      { ex: 'calf_raise', target: '4 × 10–15 · standing' },
+      { ex: 'african_curl', target: '3 × 10–15' },
+      { ex: 'band_pull_apart', target: '2–3 × 15–20' },
+    ],
   },
 };
 
