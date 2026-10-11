@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>5+2</title>
+<meta name="theme-color" content="#0c0b09">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="5+2">
+<link rel="preload" href="fonts/barlow-condensed-600.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/barlow-condensed-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app"></div>
+<script src="storage.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+/* Update pipeline. Three things have to happen or a home-screen PWA can sit on
+   an old build indefinitely:
+   1. updateViaCache 'none' — never answer the sw.js update check from cache
+   2. check on load AND every time the app comes back to the foreground; an iOS
+      PWA resumed from the background never fires 'load' again
+   3. reload when the new worker takes over — otherwise the page keeps running
+      the old JS in memory even though the new files are cached. Never mid-session. */
+if ('serviceWorker' in navigator) {
+  let reloading = false;
+  const hadController = !!navigator.serviceWorker.controller;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading || !hadController) return;      // first install needs no reload
+    if (window.S && S.current) return;            // never interrupt a live session
+    reloading = true;
+    location.reload();
+  });
+
+  const check = () => navigator.serviceWorker.getRegistration()
+    .then((reg) => reg && reg.update())
+    .catch(() => {});
+
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') check();
+  });
+  window.checkForUpdate = check;
+}
+</script>
+</body>
+</html>
