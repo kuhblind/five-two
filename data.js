@@ -545,12 +545,12 @@ const J3_BLOCKS = {
 /* Work weight of each lift when a v39 journey starts. Barbell values include
    the bar; dumbbell values are one dumbbell with a count. */
 const J3_START = {
-  trap_bar_deadlift: 60, bench_press: 52.5, overhead_press: 25, paused_box_squat: 40,
+  trap_bar_deadlift: 68, bench_press: 62.5, overhead_press: 35, paused_box_squat: 50,
   bulgarian_split_squat: { w: 12, count: 2 }, deficit_reverse_lunge: { w: 12, count: 2 },
   romanian_deadlift: { w: 16, count: 2 }, chest_supported_row: { w: 18, count: 2 },
   single_leg_hip_thrust: { w: 16, count: 1 }, db_overhead_press: { w: 12, count: 2 },
   tempo_curl: { w: 12, count: 2 }, incline_triceps_ext: { w: 8, count: 2 },
-  trap_bar_carry: 60, suitcase_carry: { w: 24, count: 1 },
+  trap_bar_carry: 68, suitcase_carry: { w: 24, count: 1 },
 };
 
 // the four lifts a v39 journey shows on its scoreboard: no targets, just the top set

@@ -35,9 +35,9 @@ const v11 = () => {
   return s;
 };
 
-is('store version is 12', M.STORE_VERSION, 12);
+is('store version is 13', M.STORE_VERSION, 13);
 let out = run(v11());
-is('v11 migrates to v12', out.version, 12);
+is('v11 migrates to v13', out.version, 13);
 is('migration adds the home equipment profile', out.settings.equipment, M.defaultEquipment());
 is('migration adds the sprint lead-in', out.settings.sprintLeadIn, 3);
 is('migration adds work, tests', [out.work, out.tests], [{}, []]);
@@ -62,17 +62,38 @@ is('the Core circuit day gets no pyramid block', 'CORE' in j3.blocks.early, fals
 
 // work weights, tests, missed kinds, set fields
 let s = withJ3();
-s.work = { bench_press: { weight: 52.5, backoff: 9, sugg: { weight: 55, kind: 'up', text: 'Up' } }, nope: { weight: 10 }, romanian_deadlift: { weight: 16, count: 2 },
+s.work = { bench_press: { weight: 55, backoff: 9, sugg: { weight: 55, kind: 'up', text: 'Up' } }, nope: { weight: 10 }, romanian_deadlift: { weight: 16, count: 2 },
   tempo_curl: { weight: 12, count: 3 }, overhead_press: { weight: 'x' } };
 s.tests = [{ ts: 5, kind: 'cooper12', meters: 2400.4 }, { ts: 6, kind: 'other', meters: 1 }, { ts: 7, kind: 'cooper12', meters: -5 }];
 s.missed = { 'j3:1:0': 'light', 'j3:1:1': 'bogus' };
 s.sessions.push({ id: 's3', ts: 3, journeyId: 'j3', week: 1, dayIndex: 0, dayType: 'LEGS1',
   sets: [{ round: 1, ex: 'bulgarian_split_squat', amount: 8, weight: 8, count: 2 }, { round: 2, ex: 'romanian_deadlift', amount: 8, weight: 16, count: 7 }] });
 out = run(s);
-is('work keeps known lifts; stored suggestions and back-off targets from v39/v40 are dropped', out.work, { bench_press: { weight: 52.5 }, romanian_deadlift: { weight: 16, count: 2 }, tempo_curl: { weight: 12 } });
+is('work keeps known lifts; stored suggestions and back-off targets from v39/v40 are dropped', out.work, { bench_press: { weight: 55 }, romanian_deadlift: { weight: 16, count: 2 }, tempo_curl: { weight: 12 } });
 is('tests keep valid results only', out.tests, [{ ts: 5, kind: 'cooper12', meters: 2400 }]);
 is('the light missed kind is kept, unknown kinds dropped', out.missed, { 'j3:1:0': 'light' });
 is('set count must be 1 or 2', out.sessions[2].sets.map((x) => x.count), [2, undefined]);
+
+// v12 -> v13: real bar weights; untrained Journey 3 starting weights follow
+s = withJ3();
+s.settings.equipment = M.defaultEquipment();
+s.settings.equipment.home.bars = { barbell: 10, trap_bar: 10 };
+s.work = { trap_bar_deadlift: { weight: 60 }, bench_press: { weight: 52.5 }, overhead_press: { weight: 27.5 },
+  paused_box_squat: { weight: 40 }, trap_bar_carry: { weight: 60 } };
+s.sessions.push({ id: 's4', ts: 4, journeyId: 'j3', week: 1, dayIndex: 0, dayType: 'LEGS1',
+  sets: [{ round: 3, ex: 'paused_box_squat', amount: 5, weight: 40 }] });
+let before = clone(s.sessions);
+out = run(s);
+is('v13: the old 10 / 10 home bars become 20 / 18', out.settings.equipment.home.bars, { barbell: 20, trap_bar: 18 });
+is('v13: untrained starting weights move to the same plates on the real bar',
+  [out.work.trap_bar_deadlift, out.work.bench_press, out.work.trap_bar_carry], [{ weight: 68 }, { weight: 62.5 }, { weight: 68 }]);
+is('v13: a weight set by hand stays', out.work.overhead_press, { weight: 27.5 });
+is('v13: a lift already trained in Journey 3 stays', out.work.paused_box_squat, { weight: 40 });
+is('v13: no session is rewritten', out.sessions, before);
+s = withJ3();
+s.settings.equipment = M.defaultEquipment();
+s.settings.equipment.home.bars = { barbell: 15, trap_bar: 10 };
+is('v13: bars entered by hand stay', run(s).settings.equipment.home.bars, { barbell: 15, trap_bar: 10 });
 
 // equipment validation
 s = withJ3();
@@ -81,7 +102,7 @@ out = run(s);
 is('equipment: bad active profile falls back to home', out.settings.equipment.active, 'home');
 is('equipment: bars clamp, plates keep duplicates, dumbbells dedupe and sort',
   [out.settings.equipment.home.bars, out.settings.equipment.home.platePairs, out.settings.equipment.home.dumbbells, out.settings.equipment.home.kettlebells],
-  [{ barbell: 10, trap_bar: 12 }, [20, 2.5, 2.5], [8, 12], []]);
+  [{ barbell: 20, trap_bar: 12 }, [20, 2.5, 2.5], [8, 12], []]);
 is('equipment: the other gym is restored when missing', out.settings.equipment.other, M.defaultEquipment().other);
 
 // in-progress sessions from v38
@@ -135,7 +156,7 @@ if (fixture && fs.existsSync(fixture)) {
   const raw = JSON.parse(fs.readFileSync(fixture, 'utf8'));
   const res = run(raw);
   is('fixture: loads', !!res, true);
-  is('fixture: version 12', res.version, 12);
+  is('fixture: version 13', res.version, 13);
   is('fixture: session count unchanged', res.sessions.length, raw.sessions.length);
   is('fixture: no field of any old session altered', JSON.stringify(res.sessions) === JSON.stringify(raw.sessions), true);
   is('fixture: journeys unchanged', JSON.stringify(res.journeys) === JSON.stringify(raw.journeys), true);

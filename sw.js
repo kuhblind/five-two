@@ -1,5 +1,5 @@
 /* sw.js — cache-first offline shell */
-const CACHE = 'fivetwo-v42';
+const CACHE = 'fivetwo-v43';
 const ASSETS = [
   '.', 'index.html', 'styles.css', 'app.js', 'data.js', 'storage.js', 'engine.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png',

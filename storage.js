@@ -1,7 +1,7 @@
 /* storage.js — versioned localStorage persistence + normalization + export/import */
 
 const STORE_KEY = 'fivetwo.state';
-const STORE_VERSION = 12;
+const STORE_VERSION = 13;
 
 /* attr/url-safe id shape for anything interpolated into templates */
 const SAFE_ID_RE = /^[a-zA-Z0-9_-]+$/;
@@ -15,7 +15,7 @@ function defaultEquipment() {
   return {
     active: 'home',
     home: {
-      bars: { barbell: 10, trap_bar: 10 },
+      bars: { barbell: 20, trap_bar: 18 },
       platePairs: [25, 20, 15, 10, 5, 1.25, 1.25],
       dumbbells: [8, 12, 16, 18, 20, 24],
       kettlebells: [4, 16, 18],
@@ -41,7 +41,7 @@ function cleanEquipment(eq) {
   return {
     active: eq.active === 'other' ? 'other' : 'home',
     home: {
-      bars: { barbell: bar(hb.barbell, 10), trap_bar: bar(hb.trap_bar, 10) },
+      bars: { barbell: bar(hb.barbell, 20), trap_bar: bar(hb.trap_bar, 18) },
       // capped: buildable loads enumerate every subset of the pairs
       platePairs: cleanNumList(home.platePairs, 0.25, 50, 14, false),
       dumbbells: cleanNumList(home.dumbbells, 0.5, 100, 30, true).reverse(),
@@ -372,6 +372,28 @@ function migrate(state) {
     if (!state.work) state.work = {};
     if (!state.tests) state.tests = [];
     state.version = 12;
+  }
+
+  // v12 -> v13: the home bars weigh 20 (barbell) and 18 (trap bar), not the
+  // 10 / 10 v12 assumed. Bars still at that old default are corrected, and a
+  // Journey 3 starting weight not yet trained is moved to the same plates on
+  // the real bar. A weight set by hand or already trained stays. No session
+  // is rewritten.
+  if (state.version === 12) {
+    const home = state.settings && state.settings.equipment && state.settings.equipment.home;
+    if (home && home.bars && home.bars.barbell === 10 && home.bars.trap_bar === 10) {
+      home.bars = { barbell: 20, trap_bar: 18 };
+    }
+    const OLD_START = { trap_bar_deadlift: [60, 68], bench_press: [52.5, 62.5], overhead_press: [25, 35],
+      paused_box_squat: [40, 50], trap_bar_carry: [60, 68] };
+    const v39Ids = (state.journeys || []).filter((j) => j && j.scheme === 'v39').map((j) => j.id);
+    const trained = (id) => (state.sessions || []).some((s) => s && v39Ids.includes(s.journeyId)
+      && (s.sets || []).some((x) => x && x.ex === id));
+    Object.keys(OLD_START).forEach((id) => {
+      const w = state.work && state.work[id];
+      if (w && w.weight === OLD_START[id][0] && !trained(id)) w.weight = OLD_START[id][1];
+    });
+    state.version = 13;
   }
   return state;
 }

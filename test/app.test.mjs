@@ -70,7 +70,7 @@ has('fresh install: no render error', A.html(), BROKEN, false);
 ['journal', 'progress', 'program', 'settings', 'activation', 'deactivation'].forEach((v) => has('fresh install: ' + v + ' renders', A.view(v), BROKEN, false));
 has('settings: equipment section', A.view('settings'), 'Equipment · home');
 has('settings: sprint lead-in', A.html(), 'Sprint lead-in');
-is('app and store versions', [A.$('APP_VERSION'), A.S().version], ['v42', 12]);
+is('app and store versions', [A.$('APP_VERSION'), A.S().version], ['v43', 13]);
 is('sw cache name matches the app version', /const CACHE = 'fivetwo-(v\d+)'/.exec(read('sw.js'))[1], A.$('APP_VERSION'));
 is('sw caches every script the page loads',
   [...read('index.html').matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]).filter((f) => !read('sw.js').includes(`'${f}'`)), []);
@@ -95,7 +95,7 @@ A.$('newJourney()');
 let j = A.$('journey()');
 is('Journey 3: scheme and start date', [j.scheme, j.startDate], ['v39', '2026-10-19']);
 is('Journey 3: the week', j.weekPlan.map((t) => A.$(`dayLabel('${t}')`)), ['Legs 1', 'Zone 2', 'Core', 'Legs 2', 'Upper 1', 'Sprint', 'Upper 2']);
-is('Journey 3: work weights seeded', [A.S().work.bench_press, A.S().work.bulgarian_split_squat], [{ weight: 52.5 }, { weight: 12, count: 2 }]);
+is('Journey 3: work weights seeded', [A.S().work.bench_press, A.S().work.bulgarian_split_squat], [{ weight: 62.5 }, { weight: 12, count: 2 }]);
 let home = A.view('home');
 has('home: one primary action', home, '>Train<');
 is('home: where to train is one segmented choice', ['>Home<', '>Other gym<', '>Hotel room<'].map((t) => home.includes(t)), [true, true, true]);
@@ -130,29 +130,29 @@ A.$('setCardioMin(3)');
 is('cardio toggle sets the burst length', A.$('cardioSecs(S.current)'), 180);
 A.$('finishCardio()');
 c = A.S().current;
-is('round 2: box squat primer at 30 kg', [c.roundEntries[1].ex, c.roundEntries[1].role, c.roundEntries[1].weight, c.roundEntries[1].amount], ['paused_box_squat', 'Primer', 30, 5]);
+is('round 2: box squat primer at 35 kg', [c.roundEntries[1].ex, c.roundEntries[1].role, c.roundEntries[1].weight, c.roundEntries[1].amount], ['paused_box_squat', 'Primer', 35, 5]);
 is('round 2: split squat back at the work weight', [c.roundEntries[0].weight, c.roundEntries[0].count, c.roundEntries[0].amount], [12, 2, 6]);
 let html = A.html();
 is('round 2: the anchor is shown first', html.indexOf('Paused box squat') < html.indexOf('Bulgarian split squat') && html.indexOf('Paused box squat') > 0, true);
 has('round 2: POWER chip', html, 'power-chip">POWER');
 has('round 2: power cue line', html, 'class="power-cue"');
 has('round 2: role label', html, 'role-chip">Primer');
-has('round 2: plates per side', html, '>per side 10<');
+has('round 2: plates per side', html, '>per side 5 + 1.25 + 1.25<');
 is('entry index stays the slot index', c.roundEntries.map((e) => e.slot), [0, 1]);
 // a warm-up edit is logged but does not move the work weight
 A.$('stepEntryLoad(1, 1)');
-is('editing the primer does not change the work weight', [A.S().current.roundEntries[1].weight, A.S().work.paused_box_squat.weight], [32.5, 40]);
+is('editing the primer does not change the work weight', [A.S().current.roundEntries[1].weight, A.S().work.paused_box_squat.weight], [40, 50]);
 A.$('stepEntryLoad(1, -1)');
 A.$('commitRound()');
 has('cardio after round 2: easy pace line', A.html(), 'Easy pace. The top set is next.');
 A.$('finishCardio()');
 c = A.S().current;
-is('round 3: fast fives at 40 kg', [c.roundEntries[1].role, c.roundEntries[1].weight], ['Fast', 40]);
+is('round 3: fast fives at 50 kg', [c.roundEntries[1].role, c.roundEntries[1].weight], ['Fast', 50]);
 // an edit at the full work weight IS the new work weight
 A.$('stepEntryLoad(1, 1)');
-is('editing a work round updates S.work', A.S().work.paused_box_squat.weight, 42.5);
+is('editing a work round updates S.work', A.S().work.paused_box_squat.weight, 52.5);
 A.$('stepEntryLoad(1, -1)');
-is('… and back', A.S().work.paused_box_squat.weight, 40);
+is('… and back', A.S().work.paused_box_squat.weight, 50);
 // dumbbells: the stepper walks the rack, always as equal weights
 A.$('stepEntryLoad(2, 1)');
 is('dumbbell step: 2 × 16 → 2 × 18', [A.S().current.roundEntries[2].weight, A.S().current.roundEntries[2].count], [18, 2]);
@@ -239,13 +239,13 @@ is('backfill: confirm was asked', A.confirms.some((m) => m.includes('Legs 2 was 
 c = A.S().current;
 is('backfill: Legs 2 runs on Friday', [c.dayType, c.dayIndex, c.slots[1]], ['LEGS2', 4, 'trap_bar_deadlift']);
 runPyramid(A, (r, en) => {
-  if (r === 2) is('trap bar warm-up 45 × 6', [en[1].weight, en[1].amount, en[1].role], [45, 6, 'Warm-up']);
-  if (r === 3) is('trap bar top set 60 × 5', [en[1].weight, en[1].amount, en[1].role], [60, 5, 'Top set']);
-  if (r === 4) is('trap bar back-off 55 × 6', [en[1].weight, en[1].amount, en[1].role], [55, 6, 'Back-off']);
-  if (r === 3) is('carry: 30 s at 60 kg', [en[2].ex, en[2].amount, en[2].weight], ['trap_bar_carry', 30, 60]);
+  if (r === 2) is('trap bar warm-up 50.5 × 6', [en[1].weight, en[1].amount, en[1].role], [50.5, 6, 'Warm-up']);
+  if (r === 3) is('trap bar top set 68 × 5', [en[1].weight, en[1].amount, en[1].role], [68, 5, 'Top set']);
+  if (r === 4) is('trap bar back-off 60.5 × 6', [en[1].weight, en[1].amount, en[1].role], [60.5, 6, 'Back-off']);
+  if (r === 3) is('carry: 30 s at 68 kg', [en[2].ex, en[2].amount, en[2].weight], ['trap_bar_carry', 30, 68]);
 });
 s = A.S().sessions[A.S().sessions.length - 1];
-is('no automatic progression: the work weight stays where it was set', [A.S().work.trap_bar_deadlift, 'verdicts' in s], [{ weight: 60 }, false]);
+is('no automatic progression: the work weight stays where it was set', [A.S().work.trap_bar_deadlift, 'verdicts' in s], [{ weight: 68 }, false]);
 // Saturday: Legs 2 was yesterday; Upper 1 (displaced) outranks Sprint
 A.offset = 5 * 86400000;
 is('Saturday: the displaced Upper 1 is offered', A.$('backfillFor(journey(), 1, 5).offer'), 'UPPER1');
@@ -301,26 +301,26 @@ A.answer = () => true;
 c = A.S().current;
 is('upper day cardio defaults to the bike', [c.dayType, c.lastModality], ['UPPER1', 'Bike']);
 A.$('commitRound()'); A.$('finishCardio()');
-is('bench warm-up 40 × 6', [A.S().current.roundEntries[1].weight, A.S().current.roundEntries[1].amount], [40, 6]);
+is('bench warm-up 45 × 6', [A.S().current.roundEntries[1].weight, A.S().current.roundEntries[1].amount], [45, 6]);
 A.$('commitRound()'); A.$('finishCardio()');
 has('bench top set: per side 20 + 1.25', A.html(), '>per side 20 + 1.25<');
 const seen = [];
 for (let i = 0; i < 6; i++) { seen.push(A.S().current.roundEntries[1].weight); A.$('stepEntryLoad(1, 1)'); }
-is('the bench stepper only offers buildable loads', seen, [52.5, 55, 60, 62.5, 65, 70]);
+is('the bench stepper only offers buildable loads', seen, [62.5, 65, 70, 72.5, 75, 80]);
 A.$('typeEntryLoad(1, 47.5)');
 is('typing 47.5 snaps to a buildable load', A.S().current.roundEntries[1].weight, 45);
 A.$('typeEntryLoad(1, 52.5)');
 has('dumbbell lifts show 2 × 18 kg', A.html(), '2 × 18 kg');
 A.$('abandonSession()');
 
-// plateau warning: a second trap bar session at 60, then two weeks have passed
+// plateau warning: a second trap bar session at 68, then two weeks have passed
 A.$("startSession(2, 3, 'home')");
 has('no suggestion chip anywhere', (A.$('commitRound()'), A.$('finishCardio()'), A.html()), 'sugg-chip', false);
-runPyramid(A, (r, en) => { if (r === 3) is('second session: still 60, no warning after 4 days', [en[1].weight, en[1].plateau], [60, false]); });
+runPyramid(A, (r, en) => { if (r === 3) is('second session: still 68, no warning after 4 days', [en[1].weight, en[1].plateau], [68, false]); });
 has('summary: no plateau card yet', A.html(), '<h3>Plateau</h3>', false);
 has('once the week has a session the review leaves Home', A.view('home'), 'Week 1 review', false);
 A.offset = 18 * 86400000;
-is('two weeks on 60: plateau', !!A.$('plateauFor("trap_bar_deadlift", journey().id)'), true);
+is('two weeks on 68: plateau', !!A.$('plateauFor("trap_bar_deadlift", journey().id)'), true);
 has('home: the lift is flagged on the scoreboard', A.view('home'), 'plateau-tag">plateau');
 A.answer = (m) => !m.includes('was missed this week');
 A.$("startSession(3, 3, 'home')"); A.answer = () => true;
@@ -329,7 +329,7 @@ is('warm-up round: no warning on the trap bar (an edit there does not move the w
 A.$('commitRound()'); A.$('finishCardio()');
 has('top-set round: plateau warning', A.html(), 'Plateau · two weeks at this weight');
 A.$('stepEntryLoad(1, 1)');
-is('one step up moves the work weight', A.S().work.trap_bar_deadlift.weight, 62.5);
+is('one step up moves the work weight', A.S().work.trap_bar_deadlift.weight, 70.5);
 is('… and its warning is gone', A.S().current.roundEntries[1].plateau, false);
 runPyramid(A);
 is('no plateau after the step', A.$('plateauFor("trap_bar_deadlift", journey().id)'), null);
@@ -343,17 +343,17 @@ A.$('commitRound()'); A.$('finishCardio()');
 A.$('commitRound()'); A.$('finishCardio()');
 has('other gym: plain kg stepper, no plates line', A.html(), 'per side', false);
 A.$("adjustEntry(1, 'weight', 2.5)");
-is('other gym: 27.5 is allowed and becomes the work weight', [A.S().current.roundEntries[1].weight, A.S().work.overhead_press.weight], [27.5, 27.5]);
+is('other gym: 37.5 is allowed and becomes the work weight', [A.S().current.roundEntries[1].weight, A.S().work.overhead_press.weight], [37.5, 37.5]);
 A.$("adjustEntry(1, 'weight', -2.5)");
 for (let r = 3; r <= 5; r++) { A.$('commitRound()'); A.$('finishCardio()'); }
 s = A.S().sessions[A.S().sessions.length - 1];
-is('other gym: saved with the gym, the work weight is what was set', [s.gym, A.S().work.overhead_press], ['other', { weight: 25 }]);
+is('other gym: saved with the gym, the work weight is what was set', [s.gym, A.S().work.overhead_press], ['other', { weight: 35 }]);
 
 // --- scoreboard: one number per lift ---
 home = A.view('home');
 has('scoreboard: no estimate line', home, 'Estimated', false);
 has('scoreboard: top set of 5 or more', home, 'Top set of 5 or more reps');
-is('scoreboard: trap bar top set', A.$('fourLiftsRows(journey())').find((r) => r.ex === 'trap_bar_deadlift').top, 62.5);
+is('scoreboard: trap bar top set', A.$('fourLiftsRows(journey())').find((r) => r.ex === 'trap_bar_deadlift').top, 70.5);
 is('scoreboard: hotel-room sessions are excluded (no bench yet)', A.$('fourLiftsRows(journey())').find((r) => r.ex === 'bench_press').top, null);
 is('scoreboard: split squat shows the pair total', A.$('fourLiftsRows(journey())').find((r) => r.ex === 'bulgarian_split_squat').top, 24);
 
